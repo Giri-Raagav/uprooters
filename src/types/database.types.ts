@@ -28,6 +28,16 @@ export type SubjectType = 'theory' | 'laboratory' | 'project' | 'elective' | 'ma
 export type SemesterStatus = 'in_progress' | 'completed' | 'upcoming' | 'archived'
 export type AttemptResultStatus = 'pass' | 'fail' | 'arrear' | 'retake' | 'withheld' | 'absent' | 'in_progress'
 
+export type ProjectType =
+  | 'academic'
+  | 'capstone'
+  | 'personal'
+  | 'hackathon'
+  | 'competition'
+  | 'open_source'
+  | 'client'
+  | 'other'
+
 export type ProficiencyLevel = 'beginner' | 'intermediate' | 'advanced' | 'expert'
 export type StudentSkillStatus = 'claimed' | 'supported' | 'verified' | 'archived'
 export type EvidenceType =
@@ -661,6 +671,8 @@ export interface Database {
           evidence_url: string | null
           subject_id: string | null
           attempt_id: string | null
+          project_id: string | null
+          certification_id: string | null
           reference_id: string | null
           verification_status: VerificationStatus
           verification_level: VerificationLevel
@@ -681,6 +693,8 @@ export interface Database {
           evidence_url?: string | null
           subject_id?: string | null
           attempt_id?: string | null
+          project_id?: string | null
+          certification_id?: string | null
           reference_id?: string | null
           verification_status?: VerificationStatus
           verification_level?: VerificationLevel
@@ -701,6 +715,8 @@ export interface Database {
           evidence_url?: string | null
           subject_id?: string | null
           attempt_id?: string | null
+          project_id?: string | null
+          certification_id?: string | null
           reference_id?: string | null
           verification_status?: VerificationStatus
           verification_level?: VerificationLevel
@@ -739,6 +755,235 @@ export interface Database {
             foreignKeyName: 'skill_evidence_attempt_id_fkey'
             columns: ['attempt_id']
             referencedRelation: 'student_subject_attempts'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'skill_evidence_project_id_fkey'
+            columns: ['project_id']
+            referencedRelation: 'projects'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'skill_evidence_certification_id_fkey'
+            columns: ['certification_id']
+            referencedRelation: 'certifications'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          id: string
+          student_id: string
+          title: string
+          description: string | null
+          project_type: ProjectType
+          role_responsibility: string | null
+          start_date: string | null
+          end_date: string | null
+          project_url: string | null
+          documentation_url: string | null
+          verification_status: VerificationStatus
+          verification_level: VerificationLevel
+          verified_at: string | null
+          verified_by: string | null
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          title: string
+          description?: string | null
+          project_type?: ProjectType
+          role_responsibility?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          project_url?: string | null
+          documentation_url?: string | null
+          verification_status?: VerificationStatus
+          verification_level?: VerificationLevel
+          verified_at?: string | null
+          verified_by?: string | null
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          student_id?: string
+          title?: string
+          description?: string | null
+          project_type?: ProjectType
+          role_responsibility?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          project_url?: string | null
+          documentation_url?: string | null
+          verification_status?: VerificationStatus
+          verification_level?: VerificationLevel
+          verified_at?: string | null
+          verified_by?: string | null
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'projects_student_id_fkey'
+            columns: ['student_id']
+            referencedRelation: 'students'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      project_skills: {
+        Row: {
+          id: string
+          project_id: string
+          student_id: string
+          skill_id: string
+          contribution_description: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          student_id: string
+          skill_id: string
+          contribution_description?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          student_id?: string
+          skill_id?: string
+          contribution_description?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'project_skills_project_student_fkey'
+            columns: ['project_id', 'student_id']
+            referencedRelation: 'projects'
+            referencedColumns: ['id', 'student_id']
+          },
+          {
+            foreignKeyName: 'project_skills_skill_fkey'
+            columns: ['skill_id']
+            referencedRelation: 'skills'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'project_skills_student_fkey'
+            columns: ['student_id']
+            referencedRelation: 'students'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      certifications: {
+        Row: {
+          id: string
+          student_id: string
+          name: string
+          issuing_organization: string
+          issue_date: string
+          expiry_date: string | null
+          credential_id: string | null
+          credential_url: string | null
+          verification_status: VerificationStatus
+          verification_level: VerificationLevel
+          verified_at: string | null
+          verified_by: string | null
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          name: string
+          issuing_organization: string
+          issue_date: string
+          expiry_date?: string | null
+          credential_id?: string | null
+          credential_url?: string | null
+          verification_status?: VerificationStatus
+          verification_level?: VerificationLevel
+          verified_at?: string | null
+          verified_by?: string | null
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          student_id?: string
+          name?: string
+          issuing_organization?: string
+          issue_date?: string
+          expiry_date?: string | null
+          credential_id?: string | null
+          credential_url?: string | null
+          verification_status?: VerificationStatus
+          verification_level?: VerificationLevel
+          verified_at?: string | null
+          verified_by?: string | null
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'certifications_student_id_fkey'
+            columns: ['student_id']
+            referencedRelation: 'students'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      certification_skills: {
+        Row: {
+          id: string
+          certification_id: string
+          student_id: string
+          skill_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          certification_id: string
+          student_id: string
+          skill_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          certification_id?: string
+          student_id?: string
+          skill_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'certification_skills_cert_student_fkey'
+            columns: ['certification_id', 'student_id']
+            referencedRelation: 'certifications'
+            referencedColumns: ['id', 'student_id']
+          },
+          {
+            foreignKeyName: 'certification_skills_skill_fkey'
+            columns: ['skill_id']
+            referencedRelation: 'skills'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'certification_skills_student_fkey'
+            columns: ['student_id']
+            referencedRelation: 'students'
             referencedColumns: ['id']
           },
         ]
@@ -806,6 +1051,7 @@ export interface Database {
       evidence_type: EvidenceType
       verification_status: VerificationStatus
       verification_level: VerificationLevel
+      project_type: ProjectType
     }
     CompositeTypes: {
       [_ in never]: never

@@ -243,6 +243,8 @@ describe('Milestone 07 — Student Skills & Evidence (Migration 005)', () => {
         evidence_url: 'https://dsp-coursework.edu',
         subject_id: '55555555-5555-5555-5555-555555555555',
         attempt_id: '66666666-6666-6666-6666-666666666666',
+        project_id: null,
+        certification_id: null,
         reference_id: null,
         verification_status: 'verified',
         verification_level: 'official_source',
