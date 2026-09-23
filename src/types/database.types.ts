@@ -28,6 +28,25 @@ export type SubjectType = 'theory' | 'laboratory' | 'project' | 'elective' | 'ma
 export type SemesterStatus = 'in_progress' | 'completed' | 'upcoming' | 'archived'
 export type AttemptResultStatus = 'pass' | 'fail' | 'arrear' | 'retake' | 'withheld' | 'absent' | 'in_progress'
 
+export type ProficiencyLevel = 'beginner' | 'intermediate' | 'advanced' | 'expert'
+export type StudentSkillStatus = 'claimed' | 'supported' | 'verified' | 'archived'
+export type EvidenceType =
+  | 'academic_coursework'
+  | 'project'
+  | 'certification'
+  | 'internship'
+  | 'experience'
+  | 'assessment'
+  | 'portfolio'
+  | 'other'
+export type VerificationStatus = 'unverified' | 'pending' | 'verified' | 'rejected'
+export type VerificationLevel =
+  | 'unverified'
+  | 'official_source'
+  | 'official_ats'
+  | 'corroborated_public_source'
+  | 'manually_curated'
+
 export type SkillCategory =
   | 'PROGRAMMING'
   | 'EMBEDDED'
@@ -584,6 +603,146 @@ export interface Database {
           },
         ]
       }
+      student_skills: {
+        Row: {
+          id: string
+          student_id: string
+          skill_id: string
+          proficiency_level: ProficiencyLevel
+          status: StudentSkillStatus
+          confidence: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          skill_id: string
+          proficiency_level?: ProficiencyLevel
+          status?: StudentSkillStatus
+          confidence?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          student_id?: string
+          skill_id?: string
+          proficiency_level?: ProficiencyLevel
+          status?: StudentSkillStatus
+          confidence?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'student_skills_student_id_fkey'
+            columns: ['student_id']
+            referencedRelation: 'students'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'student_skills_skill_id_fkey'
+            columns: ['skill_id']
+            referencedRelation: 'skills'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      skill_evidence: {
+        Row: {
+          id: string
+          student_id: string
+          skill_id: string
+          student_skill_id: string | null
+          evidence_type: EvidenceType
+          title: string
+          description: string | null
+          evidence_url: string | null
+          subject_id: string | null
+          attempt_id: string | null
+          reference_id: string | null
+          verification_status: VerificationStatus
+          verification_level: VerificationLevel
+          verified_at: string | null
+          verified_by: string | null
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          skill_id: string
+          student_skill_id?: string | null
+          evidence_type: EvidenceType
+          title: string
+          description?: string | null
+          evidence_url?: string | null
+          subject_id?: string | null
+          attempt_id?: string | null
+          reference_id?: string | null
+          verification_status?: VerificationStatus
+          verification_level?: VerificationLevel
+          verified_at?: string | null
+          verified_by?: string | null
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          student_id?: string
+          skill_id?: string
+          student_skill_id?: string | null
+          evidence_type?: EvidenceType
+          title?: string
+          description?: string | null
+          evidence_url?: string | null
+          subject_id?: string | null
+          attempt_id?: string | null
+          reference_id?: string | null
+          verification_status?: VerificationStatus
+          verification_level?: VerificationLevel
+          verified_at?: string | null
+          verified_by?: string | null
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'skill_evidence_student_id_fkey'
+            columns: ['student_id']
+            referencedRelation: 'students'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'skill_evidence_skill_id_fkey'
+            columns: ['skill_id']
+            referencedRelation: 'skills'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'skill_evidence_student_skill_fkey'
+            columns: ['student_skill_id', 'student_id', 'skill_id']
+            referencedRelation: 'student_skills'
+            referencedColumns: ['id', 'student_id', 'skill_id']
+          },
+          {
+            foreignKeyName: 'skill_evidence_subject_id_fkey'
+            columns: ['subject_id']
+            referencedRelation: 'subjects'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'skill_evidence_attempt_id_fkey'
+            columns: ['attempt_id']
+            referencedRelation: 'student_subject_attempts'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Views: {
       student_profiles_view: {
@@ -629,6 +788,10 @@ export interface Database {
         Args: { p_student_id: string; p_semester_id: string }
         Returns: void
       }
+      sync_student_skill_status: {
+        Args: { p_student_id: string; p_skill_id: string }
+        Returns: void
+      }
     }
     Enums: {
       application_role: ApplicationRole
@@ -638,6 +801,11 @@ export interface Database {
       subject_type: SubjectType
       semester_status: SemesterStatus
       attempt_result_status: AttemptResultStatus
+      proficiency_level: ProficiencyLevel
+      student_skill_status: StudentSkillStatus
+      evidence_type: EvidenceType
+      verification_status: VerificationStatus
+      verification_level: VerificationLevel
     }
     CompositeTypes: {
       [_ in never]: never
