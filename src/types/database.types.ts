@@ -5,9 +5,10 @@
 --   - supabase/migrations/001_initial_schema.sql
 --   - supabase/migrations/002_seed_phase1_taxonomy.sql
 --   - supabase/migrations/003_student_profile.sql
+--   - supabase/migrations/004_academic_system.sql
 -- Spec references:
---   docs/05_DATABASE_SPEC.md (§3–§12, §19–§22, §76–§78)
---   docs/07_SECURITY_MODEL.md (§6–§15, §17, §24)
+--   docs/05_DATABASE_SPEC.md (§3–§18, §19–§22, §76–§78)
+--   docs/07_SECURITY_MODEL.md (§6–§15, §17, §24, §27–§30)
 -- ============================================================================
  */
 
@@ -22,6 +23,10 @@ export type Json =
 export type ApplicationRole = 'student' | 'data_editor' | 'verifier' | 'super_admin'
 export type InstitutionStatus = 'active' | 'inactive' | 'archived'
 export type SkillStatus = 'active' | 'inactive' | 'archived'
+
+export type SubjectType = 'theory' | 'laboratory' | 'project' | 'elective' | 'mandatory' | 'other'
+export type SemesterStatus = 'in_progress' | 'completed' | 'upcoming' | 'archived'
+export type AttemptResultStatus = 'pass' | 'fail' | 'arrear' | 'retake' | 'withheld' | 'absent' | 'in_progress'
 
 export type SkillCategory =
   | 'PROGRAMMING'
@@ -362,6 +367,223 @@ export interface Database {
           },
         ]
       }
+      subjects: {
+        Row: {
+          id: string
+          department_id: string
+          code: string
+          name: string
+          normalized_name: string
+          credits: number
+          subject_type: SubjectType
+          status: InstitutionStatus
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          department_id: string
+          code: string
+          name: string
+          normalized_name?: string
+          credits: number
+          subject_type?: SubjectType
+          status?: InstitutionStatus
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          department_id?: string
+          code?: string
+          name?: string
+          normalized_name?: string
+          credits?: number
+          subject_type?: SubjectType
+          status?: InstitutionStatus
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'subjects_department_id_fkey'
+            columns: ['department_id']
+            referencedRelation: 'departments'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      student_semesters: {
+        Row: {
+          id: string
+          student_id: string
+          semester_number: number
+          academic_year: string
+          semester_label: string
+          start_date: string | null
+          end_date: string | null
+          status: SemesterStatus
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          semester_number: number
+          academic_year: string
+          semester_label: string
+          start_date?: string | null
+          end_date?: string | null
+          status?: SemesterStatus
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          student_id?: string
+          semester_number?: number
+          academic_year?: string
+          semester_label?: string
+          start_date?: string | null
+          end_date?: string | null
+          status?: SemesterStatus
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'student_semesters_student_id_fkey'
+            columns: ['student_id']
+            referencedRelation: 'students'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      student_subject_attempts: {
+        Row: {
+          id: string
+          student_id: string
+          semester_id: string
+          subject_id: string
+          attempt_number: number
+          marks: number | null
+          grade: string | null
+          grade_points: number | null
+          credits_attempted: number
+          credits_earned: number
+          result_status: AttemptResultStatus
+          is_passing: boolean
+          is_latest_attempt: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          semester_id: string
+          subject_id: string
+          attempt_number?: number
+          marks?: number | null
+          grade?: string | null
+          grade_points?: number | null
+          credits_attempted: number
+          credits_earned?: number
+          result_status?: AttemptResultStatus
+          is_passing?: boolean
+          is_latest_attempt?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          student_id?: string
+          semester_id?: string
+          subject_id?: string
+          attempt_number?: number
+          marks?: number | null
+          grade?: string | null
+          grade_points?: number | null
+          credits_attempted?: number
+          credits_earned?: number
+          result_status?: AttemptResultStatus
+          is_passing?: boolean
+          is_latest_attempt?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'student_subject_attempts_student_id_fkey'
+            columns: ['student_id']
+            referencedRelation: 'students'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'student_subject_attempts_semester_student_fkey'
+            columns: ['semester_id', 'student_id']
+            referencedRelation: 'student_semesters'
+            referencedColumns: ['id', 'student_id']
+          },
+          {
+            foreignKeyName: 'student_subject_attempts_subject_id_fkey'
+            columns: ['subject_id']
+            referencedRelation: 'subjects'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      semester_summaries: {
+        Row: {
+          id: string
+          student_id: string
+          semester_id: string
+          sgpa: number | null
+          attempted_credits: number
+          earned_credits: number
+          backlogs: number
+          calculation_version: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          semester_id: string
+          sgpa?: number | null
+          attempted_credits?: number
+          earned_credits?: number
+          backlogs?: number
+          calculation_version?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          student_id?: string
+          semester_id?: string
+          sgpa?: number | null
+          attempted_credits?: number
+          earned_credits?: number
+          backlogs?: number
+          calculation_version?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'semester_summaries_student_id_fkey'
+            columns: ['student_id']
+            referencedRelation: 'students'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'semester_summaries_semester_student_fkey'
+            columns: ['semester_id', 'student_id']
+            referencedRelation: 'student_semesters'
+            referencedColumns: ['id', 'student_id']
+          },
+        ]
+      }
     }
     Views: {
       student_profiles_view: {
@@ -399,12 +621,23 @@ export interface Database {
         Args: Record<PropertyKey, never>
         Returns: StudentProfileViewRow[]
       }
+      calculate_student_cgpa: {
+        Args: { p_student_id: string }
+        Returns: number | null
+      }
+      reconcile_semester_summary: {
+        Args: { p_student_id: string; p_semester_id: string }
+        Returns: void
+      }
     }
     Enums: {
       application_role: ApplicationRole
       institution_status: InstitutionStatus
       skill_category: SkillCategory
       skill_status: SkillStatus
+      subject_type: SubjectType
+      semester_status: SemesterStatus
+      attempt_result_status: AttemptResultStatus
     }
     CompositeTypes: {
       [_ in never]: never
