@@ -6,8 +6,9 @@
 --   - supabase/migrations/002_seed_phase1_taxonomy.sql
 --   - supabase/migrations/003_student_profile.sql
 --   - supabase/migrations/004_academic_system.sql
+--   - supabase/migrations/008_recommendations.sql
 -- Spec references:
---   docs/05_DATABASE_SPEC.md (§3–§18, §19–§22, §76–§78)
+--   docs/05_DATABASE_SPEC.md (§3–§18, §19–§22, §47–§50, §76–§78)
 --   docs/07_SECURITY_MODEL.md (§6–§15, §17, §24, §27–§30)
 -- ============================================================================
  */
@@ -99,6 +100,35 @@ export type ReadinessEvidenceStatus =
   | 'missing_data'
   | 'stale_requirement'
   | 'not_applicable'
+
+// ── M10: Recommendations types ────────────────────────────────────────────────
+export type RecommendationType =
+  | 'skill_acquisition'
+  | 'project'
+  | 'certification'
+  | 'academic'
+  | 'experience'
+  | 'other'
+
+export type RecommendationCatalogStatus = 'active' | 'inactive' | 'archived'
+
+export type StudentRecommendationStatus =
+  | 'generated'
+  | 'active'
+  | 'completed'
+  | 'verified'
+  | 'dismissed'
+  | 'expired'
+
+export type RecommendationPriority = 'critical' | 'high' | 'medium' | 'low'
+
+export type RecommendationTargetType =
+  | 'role'
+  | 'job_opening'
+  | 'skill'
+  | 'academic'
+  | 'career_domain'
+  | 'profile_area'
 
 export interface EffectiveRequirementRow {
   id: string
@@ -1438,6 +1468,183 @@ export interface Database {
           },
         ]
       }
+      recommendations: {
+        Row: {
+          id: string
+          title: string
+          description: string | null
+          recommendation_type: RecommendationType
+          skill_id: string | null
+          status: RecommendationCatalogStatus
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          description?: string | null
+          recommendation_type: RecommendationType
+          skill_id?: string | null
+          status?: RecommendationCatalogStatus
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          description?: string | null
+          recommendation_type?: RecommendationType
+          skill_id?: string | null
+          status?: RecommendationCatalogStatus
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'recommendations_skill_id_fkey'
+            columns: ['skill_id']
+            referencedRelation: 'skills'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      recommendation_skills: {
+        Row: {
+          recommendation_id: string
+          skill_id: string
+        }
+        Insert: {
+          recommendation_id: string
+          skill_id: string
+        }
+        Update: {
+          recommendation_id?: string
+          skill_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'recommendation_skills_recommendation_id_fkey'
+            columns: ['recommendation_id']
+            referencedRelation: 'recommendations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'recommendation_skills_skill_id_fkey'
+            columns: ['skill_id']
+            referencedRelation: 'skills'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      student_recommendations: {
+        Row: {
+          id: string
+          student_id: string
+          recommendation_id: string
+          source_evaluation_id: string | null
+          source_requirement_id: string | null
+          target_type: RecommendationTargetType | null
+          target_role_id: string | null
+          target_job_opening_id: string | null
+          target_skill_id: string | null
+          priority: RecommendationPriority
+          status: StudentRecommendationStatus
+          reason: string | null
+          gap_snapshot: Json
+          generated_at: string
+          completed_at: string | null
+          dismissed_at: string | null
+          expired_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          recommendation_id: string
+          source_evaluation_id?: string | null
+          source_requirement_id?: string | null
+          target_type?: RecommendationTargetType | null
+          target_role_id?: string | null
+          target_job_opening_id?: string | null
+          target_skill_id?: string | null
+          priority?: RecommendationPriority
+          status?: StudentRecommendationStatus
+          reason?: string | null
+          gap_snapshot?: Json
+          generated_at?: string
+          completed_at?: string | null
+          dismissed_at?: string | null
+          expired_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          student_id?: string
+          recommendation_id?: string
+          source_evaluation_id?: string | null
+          source_requirement_id?: string | null
+          target_type?: RecommendationTargetType | null
+          target_role_id?: string | null
+          target_job_opening_id?: string | null
+          target_skill_id?: string | null
+          priority?: RecommendationPriority
+          status?: StudentRecommendationStatus
+          reason?: string | null
+          gap_snapshot?: Json
+          generated_at?: string
+          completed_at?: string | null
+          dismissed_at?: string | null
+          expired_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'student_recommendations_student_id_fkey'
+            columns: ['student_id']
+            referencedRelation: 'students'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'student_recommendations_recommendation_id_fkey'
+            columns: ['recommendation_id']
+            referencedRelation: 'recommendations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'student_recommendations_source_evaluation_id_fkey'
+            columns: ['source_evaluation_id']
+            referencedRelation: 'readiness_evaluations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'student_recommendations_source_requirement_id_fkey'
+            columns: ['source_requirement_id']
+            referencedRelation: 'career_requirements'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'student_recommendations_target_role_id_fkey'
+            columns: ['target_role_id']
+            referencedRelation: 'roles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'student_recommendations_target_job_opening_id_fkey'
+            columns: ['target_job_opening_id']
+            referencedRelation: 'job_openings'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'student_recommendations_target_skill_id_fkey'
+            columns: ['target_skill_id']
+            referencedRelation: 'skills'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Views: {
       student_profiles_view: {
@@ -1500,6 +1707,10 @@ export interface Database {
         }
         Returns: string
       }
+      generate_recommendations_from_evaluation: {
+        Args: { p_evaluation_id: string }
+        Returns: number
+      }
     }
     Enums: {
       application_role: ApplicationRole
@@ -1527,6 +1738,11 @@ export interface Database {
       canonical_readiness_result_status: CanonicalReadinessResultStatus
       readiness_match_type: ReadinessMatchType
       readiness_evidence_status: ReadinessEvidenceStatus
+      recommendation_type: RecommendationType
+      recommendation_catalog_status: RecommendationCatalogStatus
+      student_recommendation_status: StudentRecommendationStatus
+      recommendation_priority: RecommendationPriority
+      recommendation_target_type: RecommendationTargetType
     }
     CompositeTypes: {
       [_ in never]: never
