@@ -1,10 +1,12 @@
 /**
 -- ============================================================================
 -- UPROOTERS Database Types — Authoritative Schema Types
--- Synced with: supabase/migrations/001_initial_schema.sql
+-- Synced with:
+--   - supabase/migrations/001_initial_schema.sql
+--   - supabase/migrations/002_seed_phase1_taxonomy.sql
 -- Spec references:
---   docs/05_DATABASE_SPEC.md (§3–§12)
---   docs/07_SECURITY_MODEL.md (§6–§15)
+--   docs/05_DATABASE_SPEC.md (§3–§12, §19–§22, §76–§78)
+--   docs/07_SECURITY_MODEL.md (§6–§15, §17, §24)
 -- ============================================================================
  */
 
@@ -18,6 +20,26 @@ export type Json =
 
 export type ApplicationRole = 'student' | 'data_editor' | 'verifier' | 'super_admin'
 export type InstitutionStatus = 'active' | 'inactive' | 'archived'
+export type SkillStatus = 'active' | 'inactive' | 'archived'
+
+export type SkillCategory =
+  | 'PROGRAMMING'
+  | 'EMBEDDED'
+  | 'RTOS'
+  | 'MICROCONTROLLERS'
+  | 'VLSI'
+  | 'FPGA'
+  | 'SEMICONDUCTOR'
+  | 'ELECTRONICS'
+  | 'HARDWARE'
+  | 'PCB'
+  | 'COMMUNICATION'
+  | 'RF_WIRELESS'
+  | 'IOT'
+  | 'ROBOTICS'
+  | 'SOFTWARE'
+  | 'TOOLS'
+  | 'OTHER'
 
 export interface Database {
   public: {
@@ -210,6 +232,83 @@ export interface Database {
           },
         ]
       }
+      skills: {
+        Row: {
+          id: string
+          name: string
+          normalized_name: string
+          slug: string
+          category: SkillCategory
+          parent_skill_id: string | null
+          description: string | null
+          status: SkillStatus
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          normalized_name: string
+          slug: string
+          category: SkillCategory
+          parent_skill_id?: string | null
+          description?: string | null
+          status?: SkillStatus
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          normalized_name?: string
+          slug?: string
+          category?: SkillCategory
+          parent_skill_id?: string | null
+          description?: string | null
+          status?: SkillStatus
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'skills_parent_skill_id_fkey'
+            columns: ['parent_skill_id']
+            referencedRelation: 'skills'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      skill_aliases: {
+        Row: {
+          id: string
+          skill_id: string
+          alias: string
+          normalized_alias: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          skill_id: string
+          alias: string
+          normalized_alias: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          skill_id?: string
+          alias?: string
+          normalized_alias?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'skill_aliases_skill_id_fkey'
+            columns: ['skill_id']
+            referencedRelation: 'skills'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -231,6 +330,8 @@ export interface Database {
     Enums: {
       application_role: ApplicationRole
       institution_status: InstitutionStatus
+      skill_category: SkillCategory
+      skill_status: SkillStatus
     }
     CompositeTypes: {
       [_ in never]: never
