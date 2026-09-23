@@ -1,33 +1,131 @@
+/* ─── Google Fonts ─────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Brand Design Tokens (fixed — never change with theme) ─────────── */
 :root {
-  --color-brand-wine: #58111A;
-  --color-brand-emerald: #013328;
-  --color-brand-accent: #F2B94F;
-  --color-brand-cloudy: #94A3B8;
+  --brand-wine:         #58111A;
+  --brand-wine-light:   #722F37;
+  --brand-wine-dark:    #3D0B12;
+  --brand-wine-soft:    #FBF4F5;
+  --brand-emerald:      #013328;
+  --brand-emerald-light:#024D3D;
+  --brand-emerald-dark: #012019;
+  --brand-emerald-soft: #F0F7F5;
+  --brand-accent:       #F2B94F;
+  --brand-accent-light: #F5C772;
+  --brand-accent-dark:  #D99E32;
+  --brand-accent-soft:  #FEF8EE;
+  --brand-cloudy:       #94A3B8;
+
+  /* Semantic — light mode defaults */
+  --surface:               #FFFFFF;
+  --surface-raised:        #F8FAFC;
+  --surface-overlay:       #F1F5F9;
+  --surface-sunken:        #E2E8F0;
+  --border:                #E2E8F0;
+  --border-subtle:         #F1F5F9;
+  --text-primary:          #0F172A;
+  --text-secondary:        #475569;
+  --text-muted:            #94A3B8;
+  --sidebar-bg:            #FFFFFF;
+  --sidebar-border:        #E2E8F0;
+  --sidebar-item-hover:    #F8FAFC;
+  --sidebar-active-bg:     var(--brand-wine);
+  --sidebar-active-text:   #FFFFFF;
+  --focus-ring:            var(--brand-wine);
 }
 
-body {
-  margin: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* ─── Dark Mode Tokens ─────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --surface:               #0F172A;
+  --surface-raised:        #1E293B;
+  --surface-overlay:       #334155;
+  --surface-sunken:        #0A1120;
+  --border:                #1E293B;
+  --border-subtle:         #0F172A;
+  --text-primary:          #F1F5F9;
+  --text-secondary:        #94A3B8;
+  --text-muted:            #64748B;
+  --sidebar-bg:            #0A1120;
+  --sidebar-border:        #1E293B;
+  --sidebar-item-hover:    #1E293B;
+  --sidebar-active-bg:     var(--brand-wine);
+  --sidebar-active-text:   #FFFFFF;
+  --focus-ring:            var(--brand-accent);
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* ─── Admin Theme Override (stacks on top of light/dark) ────────────── */
+[data-shell="admin"] {
+  --sidebar-bg:            var(--brand-emerald);
+  --sidebar-border:        #01251c;
+  --sidebar-item-hover:    rgba(255,255,255,0.06);
+  --sidebar-active-bg:     rgba(255,255,255,0.15);
+  --sidebar-active-text:   #FFFFFF;
 }
-::-webkit-scrollbar-track {
-  background: transparent;
+
+[data-theme="dark"][data-shell="admin"],
+[data-shell="admin"][data-theme="dark"] {
+  --sidebar-bg:            #011f17;
+  --sidebar-border:        #01251c;
 }
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
+
+/* ─── Base Layer ───────────────────────────────────────────────────── */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: var(--surface-raised);
+    color: var(--text-primary);
+    transition: background-color 200ms ease, color 150ms ease;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--text-primary);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
 }
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+
+/* ─── Custom Scrollbar ─────────────────────────────────────────────── */
+::-webkit-scrollbar          { width: 5px; height: 5px; }
+::-webkit-scrollbar-track    { background: transparent; }
+::-webkit-scrollbar-thumb    { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ─── Sidebar Transitions ──────────────────────────────────────────── */
+.sidebar-nav-item {
+  transition: background-color 140ms ease, color 140ms ease, transform 120ms ease;
+}
+
+.sidebar-nav-item:hover .sidebar-nav-icon {
+  transform: translateX(1.5px);
+  transition: transform 120ms ease;
+}
+
+/* ─── Reduced Motion ───────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
