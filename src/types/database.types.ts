@@ -130,6 +130,59 @@ export type RecommendationTargetType =
   | 'career_domain'
   | 'profile_area'
 
+// ── M11: Career Sources, Targets, Verification & Audit types ──────────────────
+export type SourceType =
+  | 'official_careers_page'
+  | 'official_job_posting'
+  | 'official_company_page'
+  | 'public_job_board'
+  | 'public_recruitment_post'
+  | 'other_public_source'
+  | 'discovery_source'
+
+export type TrustTier =
+  | 'tier_1_official'
+  | 'tier_2_verified_job_board'
+  | 'tier_3_public_curated'
+  | 'tier_4_unverified'
+
+export type CareerSourceStatus = 'active' | 'inactive' | 'archived'
+
+export type CareerSourceEntityType =
+  | 'company'
+  | 'role'
+  | 'job_opening'
+  | 'career_requirement'
+
+export type VerificationEntityType =
+  | 'company'
+  | 'role'
+  | 'job_opening'
+  | 'career_requirement'
+  | 'skill_evidence'
+
+export type CareerTargetStatus = 'active' | 'archived'
+
+export type AuditAction =
+  | 'CREATE'
+  | 'UPDATE'
+  | 'DELETE'
+  | 'ARCHIVE'
+  | 'PUBLISH'
+  | 'UNPUBLISH'
+  | 'VERIFY'
+  | 'REJECT'
+  | 'RETIRE'
+
+export type AuditActorType =
+  | 'student'
+  | 'data_editor'
+  | 'verifier'
+  | 'super_admin'
+  | 'system'
+
+export type IngestionBatchStatus = 'in_progress' | 'completed' | 'failed'
+
 export interface EffectiveRequirementRow {
   id: string
   target_type: TargetType
@@ -1645,6 +1698,294 @@ export interface Database {
           },
         ]
       }
+      career_sources: {
+        Row: {
+          id: string
+          name: string
+          publisher: string
+          source_type: SourceType
+          url: string | null
+          trust_tier: TrustTier
+          status: CareerSourceStatus
+          captured_at: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          publisher: string
+          source_type: SourceType
+          url?: string | null
+          trust_tier?: TrustTier
+          status?: CareerSourceStatus
+          captured_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          publisher?: string
+          source_type?: SourceType
+          url?: string | null
+          trust_tier?: TrustTier
+          status?: CareerSourceStatus
+          captured_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      career_source_links: {
+        Row: {
+          id: string
+          source_id: string
+          entity_type: CareerSourceEntityType
+          company_id: string | null
+          role_id: string | null
+          job_opening_id: string | null
+          career_requirement_id: string | null
+          extract_snippet: string | null
+          captured_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          source_id: string
+          entity_type: CareerSourceEntityType
+          company_id?: string | null
+          role_id?: string | null
+          job_opening_id?: string | null
+          career_requirement_id?: string | null
+          extract_snippet?: string | null
+          captured_at?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          source_id?: string
+          entity_type?: CareerSourceEntityType
+          company_id?: string | null
+          role_id?: string | null
+          job_opening_id?: string | null
+          career_requirement_id?: string | null
+          extract_snippet?: string | null
+          captured_at?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'career_source_links_source_id_fkey'
+            columns: ['source_id']
+            referencedRelation: 'career_sources'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'career_source_links_company_id_fkey'
+            columns: ['company_id']
+            referencedRelation: 'companies'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'career_source_links_role_id_fkey'
+            columns: ['role_id']
+            referencedRelation: 'roles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'career_source_links_job_opening_id_fkey'
+            columns: ['job_opening_id']
+            referencedRelation: 'job_openings'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'career_source_links_career_requirement_id_fkey'
+            columns: ['career_requirement_id']
+            referencedRelation: 'career_requirements'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      verification_records: {
+        Row: {
+          id: string
+          entity_type: VerificationEntityType
+          entity_id: string
+          verifier_id: string
+          verification_status: VerificationStatus
+          verification_level: VerificationLevel
+          notes: string | null
+          verified_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          entity_type: VerificationEntityType
+          entity_id: string
+          verifier_id: string
+          verification_status: VerificationStatus
+          verification_level: VerificationLevel
+          notes?: string | null
+          verified_at?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          entity_type?: VerificationEntityType
+          entity_id?: string
+          verifier_id?: string
+          verification_status?: VerificationStatus
+          verification_level?: VerificationLevel
+          notes?: string | null
+          verified_at?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      student_career_targets: {
+        Row: {
+          id: string
+          student_id: string
+          target_type: TargetType
+          role_id: string | null
+          job_opening_id: string | null
+          is_primary: boolean
+          status: CareerTargetStatus
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          target_type: TargetType
+          role_id?: string | null
+          job_opening_id?: string | null
+          is_primary?: boolean
+          status?: CareerTargetStatus
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          student_id?: string
+          target_type?: TargetType
+          role_id?: string | null
+          job_opening_id?: string | null
+          is_primary?: boolean
+          status?: CareerTargetStatus
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'student_career_targets_student_id_fkey'
+            columns: ['student_id']
+            referencedRelation: 'students'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'student_career_targets_role_id_fkey'
+            columns: ['role_id']
+            referencedRelation: 'roles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'student_career_targets_job_opening_id_fkey'
+            columns: ['job_opening_id']
+            referencedRelation: 'job_openings'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      audit_logs: {
+        Row: {
+          id: string
+          entity_type: string
+          entity_id: string
+          action: AuditAction
+          actor_id: string
+          actor_type: AuditActorType
+          before_state: Json | null
+          after_state: Json | null
+          changed_fields: string[] | null
+          reason: string | null
+          batch_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          entity_type: string
+          entity_id: string
+          action: AuditAction
+          actor_id: string
+          actor_type: AuditActorType
+          before_state?: Json | null
+          after_state?: Json | null
+          changed_fields?: string[] | null
+          reason?: string | null
+          batch_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          entity_type?: string
+          entity_id?: string
+          action?: AuditAction
+          actor_id?: string
+          actor_type?: AuditActorType
+          before_state?: Json | null
+          after_state?: Json | null
+          changed_fields?: string[] | null
+          reason?: string | null
+          batch_id?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      ingestion_batches: {
+        Row: {
+          id: string
+          source_id: string | null
+          batch_reference: string
+          status: IngestionBatchStatus
+          records_processed: number
+          records_valid: number
+          records_invalid: number
+          error_log: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          source_id?: string | null
+          batch_reference: string
+          status?: IngestionBatchStatus
+          records_processed?: number
+          records_valid?: number
+          records_invalid?: number
+          error_log?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          source_id?: string | null
+          batch_reference?: string
+          status?: IngestionBatchStatus
+          records_processed?: number
+          records_valid?: number
+          records_invalid?: number
+          error_log?: Json | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'ingestion_batches_source_id_fkey'
+            columns: ['source_id']
+            referencedRelation: 'career_sources'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Views: {
       student_profiles_view: {
@@ -1711,6 +2052,40 @@ export interface Database {
         Args: { p_evaluation_id: string }
         Returns: number
       }
+      record_audit_event: {
+        Args: {
+          p_entity_type: string
+          p_entity_id: string
+          p_action: string
+          p_before?: Json
+          p_after?: Json
+          p_changed_fields?: string[]
+          p_reason?: string
+          p_batch_id?: string
+        }
+        Returns: string
+      }
+      verify_career_requirement: {
+        Args: {
+          p_requirement_id: string
+          p_status: string
+          p_level: string
+          p_notes?: string
+        }
+        Returns: string
+      }
+      verify_job_opening: {
+        Args: {
+          p_job_opening_id: string
+          p_status: string
+          p_notes?: string
+        }
+        Returns: string
+      }
+      mark_stale_job_openings: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
     }
     Enums: {
       application_role: ApplicationRole
@@ -1743,6 +2118,15 @@ export interface Database {
       student_recommendation_status: StudentRecommendationStatus
       recommendation_priority: RecommendationPriority
       recommendation_target_type: RecommendationTargetType
+      source_type: SourceType
+      trust_tier: TrustTier
+      career_source_status: CareerSourceStatus
+      career_source_entity_type: CareerSourceEntityType
+      verification_entity_type: VerificationEntityType
+      career_target_status: CareerTargetStatus
+      audit_action: AuditAction
+      audit_actor_type: AuditActorType
+      ingestion_batch_status: IngestionBatchStatus
     }
     CompositeTypes: {
       [_ in never]: never
