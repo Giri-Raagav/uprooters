@@ -76,6 +76,49 @@ export type SkillCategory =
   | 'TOOLS'
   | 'OTHER'
 
+export type CompanyStatus = 'active' | 'inactive' | 'archived'
+export type RoleStatus = 'active' | 'inactive' | 'archived'
+export type WorkMode = 'on_site' | 'hybrid' | 'remote'
+export type EmploymentType = 'full_time' | 'internship' | 'contract' | 'co_op'
+export type JobOpeningStatus = 'draft' | 'published' | 'closed' | 'archived' | 'stale'
+export type TargetType = 'role' | 'job_opening'
+export type RequirementType = 'skill' | 'degree' | 'branch' | 'cgpa' | 'experience' | 'certification' | 'other'
+export type RequirementScope = 'required' | 'preferred'
+export type ReadinessEvaluationStatus = 'requested' | 'validating' | 'calculating' | 'completed' | 'failed'
+export type CanonicalReadinessResultStatus = 'met' | 'partially_met' | 'not_met' | 'not_applicable' | 'unknown'
+export type ReadinessMatchType = 'exact' | 'related' | 'parent' | 'child' | 'none' | 'not_applicable'
+export type ReadinessEvidenceStatus =
+  | 'verified'
+  | 'unverified'
+  | 'supported'
+  | 'unsupported_claim'
+  | 'missing'
+  | 'stale'
+  | 'academic_record'
+  | 'calculated_cgpa'
+  | 'missing_data'
+  | 'stale_requirement'
+  | 'not_applicable'
+
+export interface EffectiveRequirementRow {
+  id: string
+  target_type: TargetType
+  role_id: string | null
+  job_opening_id: string | null
+  requirement_type: RequirementType
+  skill_id: string | null
+  requirement_scope: RequirementScope
+  is_blocking: boolean
+  title: string
+  description: string | null
+  required_value: string | null
+  weight: number
+  verification_status: VerificationStatus
+  verification_level: VerificationLevel
+  source_url: string | null
+  is_inherited: boolean
+}
+
 export interface StudentProfileViewRow {
   id: string
   user_id: string
@@ -988,6 +1031,410 @@ export interface Database {
           },
         ]
       }
+      companies: {
+        Row: {
+          id: string
+          name: string
+          normalized_name: string
+          slug: string
+          website: string | null
+          industry: string
+          description: string | null
+          status: CompanyStatus
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          slug: string
+          website?: string | null
+          industry?: string
+          description?: string | null
+          status?: CompanyStatus
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          slug?: string
+          website?: string | null
+          industry?: string
+          description?: string | null
+          status?: CompanyStatus
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      roles: {
+        Row: {
+          id: string
+          name: string
+          slug: string
+          domain: string
+          description: string | null
+          eligible_degrees: string[]
+          eligible_branches: string[]
+          minimum_cgpa: number | null
+          experience_months: number
+          status: RoleStatus
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          slug: string
+          domain?: string
+          description?: string | null
+          eligible_degrees?: string[]
+          eligible_branches?: string[]
+          minimum_cgpa?: number | null
+          experience_months?: number
+          status?: RoleStatus
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          slug?: string
+          domain?: string
+          description?: string | null
+          eligible_degrees?: string[]
+          eligible_branches?: string[]
+          minimum_cgpa?: number | null
+          experience_months?: number
+          status?: RoleStatus
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      job_openings: {
+        Row: {
+          id: string
+          company_id: string
+          role_id: string
+          title: string
+          description: string | null
+          location: string | null
+          work_mode: WorkMode
+          employment_type: EmploymentType
+          eligible_degrees: string[] | null
+          eligible_branches: string[] | null
+          minimum_cgpa: number | null
+          experience_months: number | null
+          source_url: string | null
+          status: JobOpeningStatus
+          published_at: string
+          closing_date: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          role_id: string
+          title: string
+          description?: string | null
+          location?: string | null
+          work_mode?: WorkMode
+          employment_type?: EmploymentType
+          eligible_degrees?: string[] | null
+          eligible_branches?: string[] | null
+          minimum_cgpa?: number | null
+          experience_months?: number | null
+          source_url?: string | null
+          status?: JobOpeningStatus
+          published_at?: string
+          closing_date?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          role_id?: string
+          title?: string
+          description?: string | null
+          location?: string | null
+          work_mode?: WorkMode
+          employment_type?: EmploymentType
+          eligible_degrees?: string[] | null
+          eligible_branches?: string[] | null
+          minimum_cgpa?: number | null
+          experience_months?: number | null
+          source_url?: string | null
+          status?: JobOpeningStatus
+          published_at?: string
+          closing_date?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'job_openings_company_id_fkey'
+            columns: ['company_id']
+            referencedRelation: 'companies'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'job_openings_role_id_fkey'
+            columns: ['role_id']
+            referencedRelation: 'roles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      career_requirements: {
+        Row: {
+          id: string
+          target_type: TargetType
+          role_id: string | null
+          job_opening_id: string | null
+          requirement_type: RequirementType
+          skill_id: string | null
+          requirement_scope: RequirementScope
+          is_blocking: boolean
+          title: string
+          description: string | null
+          required_value: string | null
+          weight: number
+          verification_status: VerificationStatus
+          verification_level: VerificationLevel
+          source_url: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          target_type: TargetType
+          role_id?: string | null
+          job_opening_id?: string | null
+          requirement_type: RequirementType
+          skill_id?: string | null
+          requirement_scope?: RequirementScope
+          is_blocking?: boolean
+          title: string
+          description?: string | null
+          required_value?: string | null
+          weight?: number
+          verification_status?: VerificationStatus
+          verification_level?: VerificationLevel
+          source_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          target_type?: TargetType
+          role_id?: string | null
+          job_opening_id?: string | null
+          requirement_type?: RequirementType
+          skill_id?: string | null
+          requirement_scope?: RequirementScope
+          is_blocking?: boolean
+          title?: string
+          description?: string | null
+          required_value?: string | null
+          weight?: number
+          verification_status?: VerificationStatus
+          verification_level?: VerificationLevel
+          source_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'career_requirements_role_id_fkey'
+            columns: ['role_id']
+            referencedRelation: 'roles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'career_requirements_job_opening_id_fkey'
+            columns: ['job_opening_id']
+            referencedRelation: 'job_openings'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'career_requirements_skill_id_fkey'
+            columns: ['skill_id']
+            referencedRelation: 'skills'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      readiness_evaluations: {
+        Row: {
+          id: string
+          student_id: string
+          target_type: TargetType
+          role_id: string | null
+          job_opening_id: string | null
+          status: ReadinessEvaluationStatus
+          overall_score: number
+          required_score: number
+          preferred_score: number
+          is_eligible: boolean
+          has_unresolved_blocking: boolean
+          requirement_count: number
+          satisfied_count: number
+          partial_count: number
+          missing_count: number
+          blocking_count: number
+          engine_version: string
+          calculated_at: string
+          snapshot: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          target_type: TargetType
+          role_id?: string | null
+          job_opening_id?: string | null
+          status?: ReadinessEvaluationStatus
+          overall_score: number
+          required_score: number
+          preferred_score: number
+          is_eligible?: boolean
+          has_unresolved_blocking?: boolean
+          requirement_count?: number
+          satisfied_count?: number
+          partial_count?: number
+          missing_count?: number
+          blocking_count?: number
+          engine_version?: string
+          calculated_at?: string
+          snapshot?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          student_id?: string
+          target_type?: TargetType
+          role_id?: string | null
+          job_opening_id?: string | null
+          status?: ReadinessEvaluationStatus
+          overall_score?: number
+          required_score?: number
+          preferred_score?: number
+          is_eligible?: boolean
+          has_unresolved_blocking?: boolean
+          requirement_count?: number
+          satisfied_count?: number
+          partial_count?: number
+          missing_count?: number
+          blocking_count?: number
+          engine_version?: string
+          calculated_at?: string
+          snapshot?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'readiness_evaluations_student_id_fkey'
+            columns: ['student_id']
+            referencedRelation: 'students'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'readiness_evaluations_role_id_fkey'
+            columns: ['role_id']
+            referencedRelation: 'roles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'readiness_evaluations_job_opening_id_fkey'
+            columns: ['job_opening_id']
+            referencedRelation: 'job_openings'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      readiness_requirement_results: {
+        Row: {
+          id: string
+          evaluation_id: string
+          student_id: string
+          requirement_id: string
+          requirement_type: string
+          requirement_scope: RequirementScope
+          is_blocking: boolean
+          result_status: CanonicalReadinessResultStatus
+          match_type: ReadinessMatchType
+          evidence_status: ReadinessEvidenceStatus
+          score_contribution: number
+          evidence_count: number
+          verified_evidence_count: number
+          evidence_references: Json
+          explanation: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          evaluation_id: string
+          student_id: string
+          requirement_id: string
+          requirement_type: string
+          requirement_scope: RequirementScope
+          is_blocking?: boolean
+          result_status: CanonicalReadinessResultStatus
+          match_type?: ReadinessMatchType
+          evidence_status: ReadinessEvidenceStatus
+          score_contribution?: number
+          evidence_count?: number
+          verified_evidence_count?: number
+          evidence_references?: Json
+          explanation: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          evaluation_id?: string
+          student_id?: string
+          requirement_id?: string
+          requirement_type?: string
+          requirement_scope?: RequirementScope
+          is_blocking?: boolean
+          result_status?: CanonicalReadinessResultStatus
+          match_type?: ReadinessMatchType
+          evidence_status?: ReadinessEvidenceStatus
+          score_contribution?: number
+          evidence_count?: number
+          verified_evidence_count?: number
+          evidence_references?: Json
+          explanation?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'fk_readiness_req_result_eval_direct'
+            columns: ['evaluation_id']
+            referencedRelation: 'readiness_evaluations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'fk_readiness_req_result_student'
+            columns: ['student_id']
+            referencedRelation: 'students'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'readiness_requirement_results_requirement_id_fkey'
+            columns: ['requirement_id']
+            referencedRelation: 'career_requirements'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Views: {
       student_profiles_view: {
@@ -1037,6 +1484,19 @@ export interface Database {
         Args: { p_student_id: string; p_skill_id: string }
         Returns: void
       }
+      resolve_effective_requirements: {
+        Args: { p_target_type: string; p_target_id: string }
+        Returns: EffectiveRequirementRow[]
+      }
+      evaluate_student_readiness: {
+        Args: {
+          p_student_id: string
+          p_target_type: string
+          p_target_id: string
+          p_engine_config?: Json
+        }
+        Returns: string
+      }
     }
     Enums: {
       application_role: ApplicationRole
@@ -1052,6 +1512,18 @@ export interface Database {
       verification_status: VerificationStatus
       verification_level: VerificationLevel
       project_type: ProjectType
+      company_status: CompanyStatus
+      role_status: RoleStatus
+      work_mode: WorkMode
+      employment_type: EmploymentType
+      job_opening_status: JobOpeningStatus
+      target_type: TargetType
+      requirement_type: RequirementType
+      requirement_scope: RequirementScope
+      readiness_evaluation_status: ReadinessEvaluationStatus
+      canonical_readiness_result_status: CanonicalReadinessResultStatus
+      readiness_match_type: ReadinessMatchType
+      readiness_evidence_status: ReadinessEvidenceStatus
     }
     CompositeTypes: {
       [_ in never]: never
