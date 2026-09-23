@@ -5,8 +5,12 @@ import { Navigate } from 'react-router-dom'
 import { AppLayout } from '@/layouts/AppLayout'
 import { AdminLayout } from '@/layouts/AdminLayout'
 
-// Landing
+// Landing & Auth
 import { LandingPage } from '@/features/landing/LandingPage'
+import { LoginPage } from '@/features/auth/LoginPage'
+import { SignupPage } from '@/features/auth/SignupPage'
+import { OnboardingPage } from '@/features/auth/OnboardingPage'
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 
 // Student feature pages
 import { DashboardPage } from '@/features/dashboard/DashboardPage'
@@ -29,14 +33,12 @@ import { Database, ShieldCheck, Settings } from 'lucide-react'
  * Application route configuration for UPROOTERS.
  *
  * Route structure:
- *   /        → Ace&place landing + role selector
- *   /app/*   → Student shell (AppLayout)
- *   /admin/* → Administrator shell stub (AdminLayout)
- *
- * NOTE: No route guards are implemented here. Authentication and
- * role-based access control will be added in a later milestone
- * using Supabase Auth. All routes are currently publicly accessible
- * for visual shell development purposes only.
+ *   /           → Ace&place landing + role selector
+ *   /login      → Supabase Auth sign-in
+ *   /signup     → Supabase Auth registration
+ *   /onboarding → Student profile initialization (complete_student_onboarding RPC)
+ *   /app/*      → Protected student shell (AppLayout guarded by ProtectedRoute)
+ *   /admin/*    → Administrator shell stub (AdminLayout)
  */
 export const routes: RouteObject[] = [
   {
@@ -44,8 +46,24 @@ export const routes: RouteObject[] = [
     element: <LandingPage />,
   },
   {
+    path: '/login',
+    element: <LoginPage />,
+  },
+  {
+    path: '/signup',
+    element: <SignupPage />,
+  },
+  {
+    path: '/onboarding',
+    element: <OnboardingPage />,
+  },
+  {
     path: '/app',
-    element: <AppLayout />,
+    element: (
+      <ProtectedRoute>
+        <AppLayout />
+      </ProtectedRoute>
+    ),
     children: [
       { index: true, element: <DashboardPage /> },
       { path: 'profile',          element: <ProfilePage /> },

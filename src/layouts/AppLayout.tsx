@@ -14,8 +14,10 @@ import {
   Menu,
   X,
   BookOpen,
+  LogOut,
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
+import { useAuth } from '@/contexts/AuthContext'
 
 // Student navigation — spec ref: 02_FRONTEND_SPEC §5, 03_UI_UX_SPEC §10
 const studentNavItems = [
@@ -54,74 +56,108 @@ interface SidebarContentProps {
   onNavClick?: () => void
 }
 
-const SidebarContent: React.FC<SidebarContentProps> = ({ onNavClick }) => (
-  <div className="flex flex-col h-full">
-    {/* Brand header */}
-    <div
-      className="h-[60px] flex items-center px-5 gap-3 shrink-0 border-b"
-      style={{ borderColor: 'var(--sidebar-border)' }}
-    >
+const SidebarContent: React.FC<SidebarContentProps> = ({ onNavClick }) => {
+  const { student, user, signOut } = useAuth()
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Brand header */}
       <div
-        className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm shrink-0"
-        style={{ background: 'var(--brand-wine)', color: 'var(--brand-accent)' }}
-        aria-hidden="true"
+        className="h-[60px] flex items-center px-5 gap-3 shrink-0 border-b"
+        style={{ borderColor: 'var(--sidebar-border)' }}
       >
-        <BookOpen className="w-4 h-4" />
-      </div>
-      <div className="min-w-0">
         <div
-          className="font-bold text-[15px] tracking-tight leading-none"
-          style={{ color: 'var(--text-primary)' }}
+          className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm shrink-0"
+          style={{ background: 'var(--brand-wine)', color: 'var(--brand-accent)' }}
+          aria-hidden="true"
         >
-          UPROOTERS
+          <BookOpen className="w-4 h-4" />
         </div>
-        <div
-          className="text-[10px] font-medium tracking-[0.12em] uppercase mt-0.5"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          by Ace&amp;place
-        </div>
-      </div>
-    </div>
-
-    {/* Nav links */}
-    <nav
-      className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto"
-      role="navigation"
-      aria-label="Primary navigation"
-    >
-      {studentNavItems.map(item => {
-        const Icon = item.icon
-        return (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            end={item.end}
-            onClick={onNavClick}
-            className={({ isActive }) =>
-              `sidebar-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium w-full ${
-                isActive
-                  ? 'bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-text)] shadow-sm'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--sidebar-item-hover)]'
-              }`
-            }
+        <div className="min-w-0">
+          <div
+            className="font-bold text-[15px] tracking-tight leading-none"
+            style={{ color: 'var(--text-primary)' }}
           >
-            <Icon className="sidebar-nav-icon w-4 h-4 shrink-0" aria-hidden="true" />
-            <span>{item.name}</span>
-          </NavLink>
-        )
-      })}
-    </nav>
+            UPROOTERS
+          </div>
+          <div
+            className="text-[10px] font-medium tracking-[0.12em] uppercase mt-0.5"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            by Ace&amp;place
+          </div>
+        </div>
+      </div>
 
-    {/* Sidebar footer — theme toggle */}
-    <div
-      className="px-4 py-4 border-t shrink-0"
-      style={{ borderColor: 'var(--sidebar-border)' }}
-    >
-      <ThemeToggle className="w-full" />
+      {/* Nav links */}
+      <nav
+        className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto"
+        role="navigation"
+        aria-label="Primary navigation"
+      >
+        {studentNavItems.map(item => {
+          const Icon = item.icon
+          return (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              end={item.end}
+              onClick={onNavClick}
+              className={({ isActive }) =>
+                `sidebar-nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium w-full ${
+                  isActive
+                    ? 'bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-text)] shadow-sm'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--sidebar-item-hover)]'
+                }`
+              }
+            >
+              <Icon className="sidebar-nav-icon w-4 h-4 shrink-0" aria-hidden="true" />
+              <span>{item.name}</span>
+            </NavLink>
+          )
+        })}
+      </nav>
+
+      {/* Sidebar footer — student profile & controls */}
+      <div
+        className="p-3 border-t shrink-0 space-y-2.5"
+        style={{ borderColor: 'var(--sidebar-border)' }}
+      >
+        {(student || user) && (
+          <div
+            className="p-2.5 rounded-xl border flex items-center justify-between gap-2.5"
+            style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+          >
+            <div className="min-w-0 flex-1">
+              <div
+                className="text-xs font-semibold truncate"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                {student?.display_name || user?.email?.split('@')[0] || 'Student'}
+              </div>
+              <div
+                className="text-[10px] truncate"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                {student?.college_name || user?.email || 'ECE Student'}
+              </div>
+            </div>
+            <button
+              id="sidebar-signout-btn"
+              onClick={() => signOut()}
+              className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-red-500 hover:text-red-600 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-500"
+              aria-label="Sign out of student account"
+              title="Sign out"
+            >
+              <LogOut className="w-4 h-4" aria-hidden="true" />
+            </button>
+          </div>
+        )}
+        <ThemeToggle className="w-full" />
+      </div>
     </div>
-  </div>
-)
+  )
+}
 
 // ─── AppLayout ────────────────────────────────────────────────────────
 /**
@@ -136,6 +172,7 @@ const SidebarContent: React.FC<SidebarContentProps> = ({ onNavClick }) => (
 export const AppLayout: React.FC = () => {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const pageTitle = usePageTitle()
+  const { signOut } = useAuth()
 
   // Close drawer on Escape key
   useEffect(() => {
@@ -233,7 +270,19 @@ export const AppLayout: React.FC = () => {
               </span>
             </div>
           </div>
-          <ThemeToggle size="sm" />
+          <div className="flex items-center gap-2">
+            <ThemeToggle size="sm" />
+            <button
+              id="mobile-signout-btn"
+              onClick={() => signOut()}
+              className="p-1.5 rounded-lg border hover:bg-black/5 dark:hover:bg-white/5 text-red-500 hover:text-red-600 transition-colors focus-visible:outline-none"
+              style={{ borderColor: 'var(--border)' }}
+              aria-label="Sign out"
+              title="Sign out"
+            >
+              <LogOut className="w-4 h-4" aria-hidden="true" />
+            </button>
+          </div>
         </header>
 
         {/* Page content */}

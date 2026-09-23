@@ -2086,6 +2086,20 @@ export interface Database {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      complete_student_onboarding: {
+        Args: {
+          p_first_name: string
+          p_last_name: string
+          p_college_id: string
+          p_department_id?: string | null
+          p_degree?: string
+          p_branch?: string
+          p_admission_year: number
+          p_expected_graduation_year: number
+          p_current_semester?: number
+        }
+        Returns: string
+      }
     }
     Enums: {
       application_role: ApplicationRole

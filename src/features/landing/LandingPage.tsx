@@ -211,15 +211,36 @@ export const LandingPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Footer note */}
-          <p
-            className="text-center text-xs mt-8 animate-fade-in"
-            style={{ color: 'var(--text-muted)', animationDelay: '200ms' }}
-          >
-            Role selection is for navigation only.
-            <br />
-            Authentication &amp; authorization will be enforced in a later milestone.
-          </p>
+          {/* Direct Auth Action */}
+          <div className="mt-8 pt-6 border-t text-center space-y-2 animate-fade-in" style={{ borderColor: 'var(--border)' }}>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              Ready to access your verified career intelligence?
+            </p>
+            <div className="flex items-center justify-center gap-3 text-xs font-semibold">
+              <button
+                id="landing-signin-btn"
+                onClick={() => navigate('/login')}
+                className="px-3.5 py-1.5 rounded-lg border transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
+              >
+                Sign In
+              </button>
+              <button
+                id="landing-signup-btn"
+                onClick={() => navigate('/signup')}
+                className="px-3.5 py-1.5 rounded-lg transition-colors hover:opacity-90"
+                style={{ background: 'var(--brand-wine)', color: 'white' }}
+              >
+                Create Account
+              </button>
+            </div>
+            <p
+              className="text-center text-xs mt-3 pt-2 text-muted"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              Role selection is for navigation only.
+            </p>
+          </div>
         </div>
       </div>
     </div>
