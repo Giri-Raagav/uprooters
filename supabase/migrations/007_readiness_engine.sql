@@ -76,7 +76,7 @@ CREATE INDEX IF NOT EXISTS idx_roles_status ON public.roles(status);
 -- Spec ref: docs/05_DATABASE_SPEC.md §33, docs/06_READINESS_ENGINE.md §4, §6
 CREATE TABLE IF NOT EXISTS public.job_openings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+  company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE RESTRICT,
   role_id UUID NOT NULL REFERENCES public.roles(id) ON DELETE RESTRICT,
   title TEXT NOT NULL CHECK (char_length(trim(title)) > 0),
   description TEXT,
@@ -113,8 +113,8 @@ CREATE INDEX IF NOT EXISTS idx_job_openings_closing_date ON public.job_openings(
 CREATE TABLE IF NOT EXISTS public.career_requirements (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   target_type VARCHAR(20) NOT NULL CHECK (target_type IN ('role', 'job_opening')),
-  role_id UUID REFERENCES public.roles(id) ON DELETE CASCADE,
-  job_opening_id UUID REFERENCES public.job_openings(id) ON DELETE CASCADE,
+  role_id UUID REFERENCES public.roles(id) ON DELETE RESTRICT,
+  job_opening_id UUID REFERENCES public.job_openings(id) ON DELETE RESTRICT,
   requirement_type VARCHAR(50) NOT NULL CHECK (requirement_type IN ('skill', 'degree', 'branch', 'cgpa', 'experience', 'certification', 'other')),
   skill_id UUID REFERENCES public.skills(id) ON DELETE RESTRICT,
   requirement_scope VARCHAR(20) NOT NULL DEFAULT 'required' CHECK (requirement_scope IN ('required', 'preferred')),
@@ -157,8 +157,8 @@ CREATE TABLE IF NOT EXISTS public.readiness_evaluations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
   target_type VARCHAR(20) NOT NULL CHECK (target_type IN ('role', 'job_opening')),
-  role_id UUID REFERENCES public.roles(id) ON DELETE CASCADE,
-  job_opening_id UUID REFERENCES public.job_openings(id) ON DELETE CASCADE,
+  role_id UUID REFERENCES public.roles(id) ON DELETE RESTRICT,
+  job_opening_id UUID REFERENCES public.job_openings(id) ON DELETE RESTRICT,
   status VARCHAR(20) NOT NULL DEFAULT 'completed'
     CHECK (status IN ('requested', 'validating', 'calculating', 'completed', 'failed')),
   overall_score NUMERIC(5, 2) NOT NULL CHECK (overall_score >= 0 AND overall_score <= 100),
@@ -203,7 +203,7 @@ CREATE TABLE IF NOT EXISTS public.readiness_requirement_results (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   evaluation_id UUID NOT NULL,
   student_id UUID NOT NULL,
-  requirement_id UUID NOT NULL REFERENCES public.career_requirements(id) ON DELETE CASCADE,
+  requirement_id UUID NOT NULL REFERENCES public.career_requirements(id) ON DELETE RESTRICT,
   requirement_type VARCHAR(50) NOT NULL,
   requirement_scope VARCHAR(20) NOT NULL CHECK (requirement_scope IN ('required', 'preferred')),
   is_blocking BOOLEAN NOT NULL DEFAULT false,
@@ -478,16 +478,24 @@ BEGIN
     RAISE EXCEPTION 'Invalid target_type: %. Must be ''role'' or ''job_opening''.', p_target_type;
   END IF;
 
-  -- 4. Load configured weights if provided
-  IF p_engine_config IS NOT NULL THEN
+  -- 4. Engine Configuration (Locked Authoritative v1 Model)
+  -- Invariant: For engine version 1.0.0, the configuration is strictly locked:
+  --   Required weight = 1.0, Preferred weight = 0.5, Related-skill credit = 0.00.
+  -- Ordinary authenticated students are strictly prohibited from altering scoring configuration via p_engine_config.
+  -- Only administrative callers may supply an experimental configuration if p_engine_config is provided.
+  IF p_engine_config IS NOT NULL AND v_is_caller_admin THEN
     IF (p_engine_config->>'required_weight') IS NOT NULL THEN
       v_w_req := (p_engine_config->>'required_weight')::numeric;
     END IF;
     IF (p_engine_config->>'preferred_weight') IS NOT NULL THEN
       v_w_pref := (p_engine_config->>'preferred_weight')::numeric;
     END IF;
-    -- Note: related-skill score credit remains strictly 0.00 as approved
+  ELSE
+    -- Authoritative v1 defaults locked for all non-admin / student callers
+    v_w_req := 1.0;
+    v_w_pref := 0.5;
   END IF;
+  v_related_credit := 0.00; -- strictly 0.00 as approved for all callers
 
   -- 5. Create temporary table to stage requirement results
   CREATE TEMPORARY TABLE temp_requirement_results (
@@ -572,32 +580,46 @@ BEGIN
       ELSE
         -- B. Check related/parent/child taxonomy skills
         -- Exact skill != Related skill invariant: can NEVER produce MET for exact required skill.
-        SELECT sk.id, sk.name, ss.id AS student_skill_id
+        -- Stable, deterministic ordering prioritizing skills with verified evidence, then any evidence,
+        -- followed by canonical alphabetical name and UUID tie-breaker.
+        SELECT
+          sk.id,
+          sk.name,
+          ss.id AS student_skill_id,
+          COALESCE(ev_stats.ev_count, 0)::INT AS ev_count,
+          COALESCE(ev_stats.verified_ev_count, 0)::INT AS verified_ev_count
         INTO v_related_skill
         FROM public.skills sk
         JOIN public.student_skills ss ON ss.skill_id = sk.id
+        LEFT JOIN LATERAL (
+          SELECT
+            COUNT(*)::INT AS ev_count,
+            COUNT(*) FILTER (WHERE se.verification_status = 'verified')::INT AS verified_ev_count
+          FROM public.skill_evidence se
+          WHERE se.student_id = p_student_id
+            AND se.skill_id = sk.id
+        ) ev_stats ON true
         WHERE ss.student_id = p_student_id
           AND (
             sk.parent_skill_id = r.skill_id
             OR sk.id = (SELECT parent_skill_id FROM public.skills WHERE id = r.skill_id)
           )
+        ORDER BY
+          (COALESCE(ev_stats.verified_ev_count, 0) > 0) DESC,
+          (COALESCE(ev_stats.ev_count, 0) > 0) DESC,
+          sk.name ASC,
+          sk.id ASC
         LIMIT 1;
 
         IF v_related_skill.id IS NOT NULL THEN
-          -- Check if student has evidence for the related skill
-          SELECT
-            COUNT(*)::INT,
-            COUNT(*) FILTER (WHERE se.verification_status = 'verified')::INT
-          INTO v_ev_count, v_verified_ev_count
-          FROM public.skill_evidence se
-          WHERE se.student_id = p_student_id
-            AND se.skill_id = v_related_skill.id;
+          v_ev_count := v_related_skill.ev_count;
+          v_verified_ev_count := v_related_skill.verified_ev_count;
 
           IF v_ev_count > 0 THEN
             v_res_status := 'partially_met';
             v_match_type := 'related';
             v_ev_status := 'supported';
-            v_score_contribution := v_related_credit; -- 0.00 numerical points
+            v_score_contribution := v_related_credit; -- strictly 0.00 numerical points
             v_explanation := format('Supporting related skill %s detected; related skill does not satisfy exact required skill.', v_related_skill.name);
           ELSE
             v_res_status := 'not_met';

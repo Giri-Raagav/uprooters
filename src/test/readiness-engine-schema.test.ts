@@ -71,7 +71,7 @@ describe('Milestone 09 — Readiness Engine (Migration 007)', () => {
   describe('3. Job Openings Schema (§33, Readiness Engine §4, §6)', () => {
     it('creates public.job_openings with company FK, role FK, and work modes', () => {
       expect(migrationSql).toMatch(/CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+public\.job_openings\b/i)
-      expect(migrationSql).toMatch(/company_id\s+UUID\s+NOT\s+NULL\s+REFERENCES\s+public\.companies\(id\)\s+ON\s+DELETE\s+CASCADE/i)
+      expect(migrationSql).toMatch(/company_id\s+UUID\s+NOT\s+NULL\s+REFERENCES\s+public\.companies\(id\)\s+ON\s+DELETE\s+RESTRICT/i)
       expect(migrationSql).toMatch(/role_id\s+UUID\s+NOT\s+NULL\s+REFERENCES\s+public\.roles\(id\)\s+ON\s+DELETE\s+RESTRICT/i)
       expect(migrationSql).toMatch(/title\s+TEXT\s+NOT\s+NULL\s+CHECK\s*\(\s*char_length\(trim\(title\)\)\s*>\s*0\s*\)/i)
       expect(migrationSql).toMatch(/work_mode\s+VARCHAR\(20\)\s+NOT\s+NULL\s+DEFAULT\s+'on_site'\s+CHECK\s*\(\s*work_mode\s+IN\s*\(\s*'on_site',\s*'hybrid',\s*'remote'\s*\)\s*\)/i)
@@ -95,8 +95,8 @@ describe('Milestone 09 — Readiness Engine (Migration 007)', () => {
     it('creates public.career_requirements with requirement scopes and blocking flag', () => {
       expect(migrationSql).toMatch(/CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+public\.career_requirements\b/i)
       expect(migrationSql).toMatch(/target_type\s+VARCHAR\(20\)\s+NOT\s+NULL\s+CHECK\s*\(\s*target_type\s+IN\s*\(\s*'role',\s*'job_opening'\s*\)\s*\)/i)
-      expect(migrationSql).toMatch(/role_id\s+UUID\s+REFERENCES\s+public\.roles\(id\)\s+ON\s+DELETE\s+CASCADE/i)
-      expect(migrationSql).toMatch(/job_opening_id\s+UUID\s+REFERENCES\s+public\.job_openings\(id\)\s+ON\s+DELETE\s+CASCADE/i)
+      expect(migrationSql).toMatch(/role_id\s+UUID\s+REFERENCES\s+public\.roles\(id\)\s+ON\s+DELETE\s+RESTRICT/i)
+      expect(migrationSql).toMatch(/job_opening_id\s+UUID\s+REFERENCES\s+public\.job_openings\(id\)\s+ON\s+DELETE\s+RESTRICT/i)
       expect(migrationSql).toMatch(/requirement_type\s+VARCHAR\(50\)\s+NOT\s+NULL\s+CHECK\s*\(\s*requirement_type\s+IN\s*\(\s*'skill',\s*'degree',\s*'branch',\s*'cgpa',\s*'experience',\s*'certification',\s*'other'\s*\)\s*\)/i)
       expect(migrationSql).toMatch(/skill_id\s+UUID\s+REFERENCES\s+public\.skills\(id\)\s+ON\s+DELETE\s+RESTRICT/i)
       expect(migrationSql).toMatch(/requirement_scope\s+VARCHAR\(20\)\s+NOT\s+NULL\s+DEFAULT\s+'required'\s+CHECK\s*\(\s*requirement_scope\s+IN\s*\(\s*'required',\s*'preferred'\s*\)\s*\)/i)
@@ -120,6 +120,8 @@ describe('Milestone 09 — Readiness Engine (Migration 007)', () => {
     it('creates public.readiness_evaluations with scores, counts, version, and snapshot JSONB', () => {
       expect(migrationSql).toMatch(/CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+public\.readiness_evaluations\b/i)
       expect(migrationSql).toMatch(/student_id\s+UUID\s+NOT\s+NULL\s+REFERENCES\s+public\.students\(id\)\s+ON\s+DELETE\s+CASCADE/i)
+      expect(migrationSql).toMatch(/role_id\s+UUID\s+REFERENCES\s+public\.roles\(id\)\s+ON\s+DELETE\s+RESTRICT/i)
+      expect(migrationSql).toMatch(/job_opening_id\s+UUID\s+REFERENCES\s+public\.job_openings\(id\)\s+ON\s+DELETE\s+RESTRICT/i)
       expect(migrationSql).toMatch(/status\s+VARCHAR\(20\)\s+NOT\s+NULL\s+DEFAULT\s+'completed'\s+CHECK\s*\(\s*status\s+IN\s*\(\s*'requested',\s*'validating',\s*'calculating',\s*'completed',\s*'failed'\s*\)\s*\)/i)
       expect(migrationSql).toMatch(/overall_score\s+NUMERIC\(5,\s*2\)\s+NOT\s+NULL\s+CHECK\s*\(\s*overall_score\s*>=\s*0\s+AND\s+overall_score\s*<=\s*100\s*\)/i)
       expect(migrationSql).toMatch(/required_score\s+NUMERIC\(5,\s*2\)\s+NOT\s+NULL\s+CHECK\s*\(\s*required_score\s*>=\s*0\s+AND\s+required_score\s*<=\s*100\s*\)/i)
@@ -135,11 +137,11 @@ describe('Milestone 09 — Readiness Engine (Migration 007)', () => {
   })
 
   describe('6. Readiness Requirement Results Schema & Canonical States (§45, §30–§35)', () => {
-    it('creates public.readiness_requirement_results with composite ownership foreign key', () => {
+    it('creates public.readiness_requirement_results with composite ownership foreign key and RESTRICT requirement FK', () => {
       expect(migrationSql).toMatch(/CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+public\.readiness_requirement_results\b/i)
       expect(migrationSql).toMatch(/evaluation_id\s+UUID\s+NOT\s+NULL/i)
       expect(migrationSql).toMatch(/student_id\s+UUID\s+NOT\s+NULL/i)
-      expect(migrationSql).toMatch(/requirement_id\s+UUID\s+NOT\s+NULL\s+REFERENCES\s+public\.career_requirements\(id\)\s+ON\s+DELETE\s+CASCADE/i)
+      expect(migrationSql).toMatch(/requirement_id\s+UUID\s+NOT\s+NULL\s+REFERENCES\s+public\.career_requirements\(id\)\s+ON\s+DELETE\s+RESTRICT/i)
       expect(migrationSql).toMatch(/CONSTRAINT\s+fk_readiness_req_result_eval_student\s+FOREIGN\s+KEY\s*\(\s*evaluation_id,\s*student_id\s*\)\s+REFERENCES\s+public\.readiness_evaluations\s*\(\s*id,\s*student_id\s*\)\s+ON\s+DELETE\s+CASCADE/i)
     })
 
@@ -209,11 +211,16 @@ describe('Milestone 09 — Readiness Engine (Migration 007)', () => {
       expect(evalFuncBody).toMatch(/RAISE\s+EXCEPTION\s+'Access denied/i)
     })
 
-    it('uses approved v1 engine configuration: version 1.0.0, W_req = 1.0, W_pref = 0.5, related credit = 0.00', () => {
+    it('uses approved v1 engine configuration: version 1.0.0, W_req = 1.0, W_pref = 0.5, related credit = 0.00 and locks it against student overrides', () => {
       expect(evalFuncBody).toMatch(/v_engine_version\s+VARCHAR\(20\)\s*:=\s*'1\.0\.0';/i)
-      expect(evalFuncBody).toMatch(/v_w_req\s+NUMERIC\(4,\s*2\)\s*:=\s*1\.0;/i)
-      expect(evalFuncBody).toMatch(/v_w_pref\s+NUMERIC\(4,\s*2\)\s*:=\s*0\.5;/i)
-      expect(evalFuncBody).toMatch(/v_related_credit\s+NUMERIC\(4,\s*2\)\s*:=\s*0\.00;/i)
+      expect(evalFuncBody).toMatch(/IF\s+p_engine_config\s+IS\s+NOT\s+NULL\s+AND\s+v_is_caller_admin\s+THEN/i)
+      expect(evalFuncBody).toMatch(/v_w_req\s*:=\s*1\.0;\s*v_w_pref\s*:=\s*0\.5;/i)
+      expect(evalFuncBody).toMatch(/v_related_credit\s*:=\s*0\.00;/i)
+    })
+
+    it('enforces deterministic related-skill selection: lateral evidence lookup, evidence priority, canonical name and id tie-breaker', () => {
+      expect(evalFuncBody).toMatch(/LEFT\s+JOIN\s+LATERAL\s*\(\s*SELECT\s+COUNT\(\*\)::INT\s+AS\s+ev_count,\s*COUNT\(\*\)\s+FILTER\s*\(\s*WHERE\s+se\.verification_status\s*=\s*'verified'\s*\)::INT\s+AS\s+verified_ev_count\s+FROM\s+public\.skill_evidence\s+se/i)
+      expect(evalFuncBody).toMatch(/ORDER\s+BY\s*\(\s*COALESCE\s*\(\s*ev_stats\.verified_ev_count,\s*0\s*\)\s*>\s*0\s*\)\s+DESC,\s*\(\s*COALESCE\s*\(\s*ev_stats\.ev_count,\s*0\s*\)\s*>\s*0\s*\)\s+DESC,\s*sk\.name\s+ASC,\s*sk\.id\s+ASC\s+LIMIT\s+1;/i)
     })
 
     it('enforces exact skill != related skill invariant and related score contribution = 0.00', () => {
@@ -499,6 +506,33 @@ describe('Milestone 09 — Readiness Engine (Migration 007)', () => {
 
     it('preserves canonical skill ON DELETE RESTRICT in career_requirements', () => {
       expect(migrationSql).toMatch(/skill_id\s+UUID\s+REFERENCES\s+public\.skills\(id\)\s+ON\s+DELETE\s+RESTRICT/i)
+    })
+  })
+
+  describe('13. Historical Readiness Snapshot Integrity (§27, Database Spec §44–§45)', () => {
+    it('prevents cascading deletion of historical requirement results when a career requirement is deleted (ON DELETE RESTRICT)', () => {
+      expect(migrationSql).toMatch(/requirement_id\s+UUID\s+NOT\s+NULL\s+REFERENCES\s+public\.career_requirements\(id\)\s+ON\s+DELETE\s+RESTRICT/i)
+    })
+
+    it('prevents cascading deletion of historical readiness evaluations when roles or job openings are deleted (ON DELETE RESTRICT)', () => {
+      const evalBlock = migrationSql.match(/CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+public\.readiness_evaluations[\s\S]*?\);/i)?.[0] || ''
+      expect(evalBlock).toMatch(/role_id\s+UUID\s+REFERENCES\s+public\.roles\(id\)\s+ON\s+DELETE\s+RESTRICT/i)
+      expect(evalBlock).toMatch(/job_opening_id\s+UUID\s+REFERENCES\s+public\.job_openings\(id\)\s+ON\s+DELETE\s+RESTRICT/i)
+    })
+
+    it('prevents cascading deletion of career requirements when roles or job openings are deleted (ON DELETE RESTRICT)', () => {
+      const crBlock = migrationSql.match(/CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+public\.career_requirements[\s\S]*?\);/i)?.[0] || ''
+      expect(crBlock).toMatch(/role_id\s+UUID\s+REFERENCES\s+public\.roles\(id\)\s+ON\s+DELETE\s+RESTRICT/i)
+      expect(crBlock).toMatch(/job_opening_id\s+UUID\s+REFERENCES\s+public\.job_openings\(id\)\s+ON\s+DELETE\s+RESTRICT/i)
+    })
+
+    it('prevents cascading deletion of job openings when companies are deleted (ON DELETE RESTRICT)', () => {
+      const joBlock = migrationSql.match(/CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+public\.job_openings[\s\S]*?\);/i)?.[0] || ''
+      expect(joBlock).toMatch(/company_id\s+UUID\s+NOT\s+NULL\s+REFERENCES\s+public\.companies\(id\)\s+ON\s+DELETE\s+RESTRICT/i)
+    })
+
+    it('preserves complete evaluation snapshot in JSONB for historical explainability', () => {
+      expect(migrationSql).toMatch(/snapshot\s+JSONB\s+NOT\s+NULL\s+DEFAULT\s+'\{\}'::jsonb/i)
     })
   })
 })
