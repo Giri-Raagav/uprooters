@@ -40,6 +40,10 @@ CREATE INDEX IF NOT EXISTS idx_companies_status ON public.companies(status);
 
 -- ── 2. Roles (public.roles) ─────────────────────────────────────────────────
 -- Stores canonical career roles, career domains, and baseline expectations.
+-- Role-level eligibility fields (eligible_degrees, eligible_branches, minimum_cgpa, experience_months)
+-- serve as baseline descriptive metadata for search, catalog filtering, and display.
+-- Authoritative criteria evaluated by the readiness engine are registered in
+-- public.career_requirements to ensure full data provenance, traceability, and weighting.
 -- Spec ref: docs/05_DATABASE_SPEC.md §32, docs/06_READINESS_ENGINE.md §4–§5
 CREATE TABLE IF NOT EXISTS public.roles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -67,6 +71,8 @@ CREATE INDEX IF NOT EXISTS idx_roles_status ON public.roles(status);
 
 -- ── 3. Job Openings (public.job_openings) ───────────────────────────────────
 -- Represents specific job vacancies published by companies, linked to generic roles.
+-- Descriptive eligibility defaults are preserved for quick faceted filtering; authoritative
+-- evaluation requirements are resolved from public.career_requirements.
 -- Spec ref: docs/05_DATABASE_SPEC.md §33, docs/06_READINESS_ENGINE.md §4, §6
 CREATE TABLE IF NOT EXISTS public.job_openings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -84,7 +90,9 @@ CREATE TABLE IF NOT EXISTS public.job_openings (
   source_url TEXT CHECK (source_url IS NULL OR source_url ~* '^https?://[^\s]+$'),
   status VARCHAR(20) NOT NULL DEFAULT 'published' CHECK (status IN ('draft', 'published', 'closed', 'archived', 'stale')),
   published_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  closing_date DATE CHECK (closing_date IS NULL OR closing_date >= CURRENT_DATE),
+  -- Historical closing dates are permitted; closed/archived status represents lifecycle validity,
+  -- while chronological ordering requires closing_date >= published_at::date when present.
+  closing_date DATE CHECK (closing_date IS NULL OR closing_date >= published_at::date),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -126,7 +134,7 @@ CREATE TABLE IF NOT EXISTS public.career_requirements (
     CHECK (
       (target_type = 'role' AND role_id IS NOT NULL AND job_opening_id IS NULL)
       OR
-      (target_type = 'job_opening' AND job_opening_id IS NOT NULL)
+      (target_type = 'job_opening' AND job_opening_id IS NOT NULL AND role_id IS NULL)
     ),
   CONSTRAINT career_requirements_skill_check
     CHECK (requirement_type <> 'skill' OR skill_id IS NOT NULL)
@@ -162,6 +170,7 @@ CREATE TABLE IF NOT EXISTS public.readiness_evaluations (
   satisfied_count INT NOT NULL DEFAULT 0 CHECK (satisfied_count >= 0),
   partial_count INT NOT NULL DEFAULT 0 CHECK (partial_count >= 0),
   missing_count INT NOT NULL DEFAULT 0 CHECK (missing_count >= 0),
+  unknown_count INT NOT NULL DEFAULT 0 CHECK (unknown_count >= 0),
   blocking_count INT NOT NULL DEFAULT 0 CHECK (blocking_count >= 0),
   engine_version VARCHAR(20) NOT NULL DEFAULT '1.0.0',
   calculated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -172,7 +181,7 @@ CREATE TABLE IF NOT EXISTS public.readiness_evaluations (
     CHECK (
       (target_type = 'role' AND role_id IS NOT NULL AND job_opening_id IS NULL)
       OR
-      (target_type = 'job_opening' AND job_opening_id IS NOT NULL)
+      (target_type = 'job_opening' AND job_opening_id IS NOT NULL AND role_id IS NULL)
     ),
   CONSTRAINT readiness_evaluations_id_student_key UNIQUE (id, student_id)
 );
@@ -410,6 +419,7 @@ DECLARE
   v_satisfied_count INT := 0;
   v_partial_count INT := 0;
   v_missing_count INT := 0;
+  v_unknown_count INT := 0;
   v_blocking_count INT := 0;
   v_has_unresolved_blocking BOOLEAN := false;
   v_is_eligible BOOLEAN := true;
@@ -720,6 +730,8 @@ BEGIN
       v_partial_count := v_partial_count + 1;
     ELSIF v_res_status = 'not_met' THEN
       v_missing_count := v_missing_count + 1;
+    ELSIF v_res_status = 'unknown' THEN
+      v_unknown_count := v_unknown_count + 1;
     END IF;
 
     -- Check blocking requirement gate:
@@ -731,11 +743,14 @@ BEGIN
       v_blocking_count := v_blocking_count + 1;
     END IF;
 
-    -- Tally scoring weights
-    IF r.requirement_scope = 'required' AND v_res_status <> 'not_applicable' THEN
+    -- Tally scoring weights:
+    -- UNKNOWN represents missing/insufficient data and must not be treated as a confirmed NOT_MET.
+    -- To prevent incomplete data from being incorrectly penalized as confirmed absence,
+    -- UNKNOWN requirements are excluded from the scoring denominator (weight sum).
+    IF r.requirement_scope = 'required' AND v_res_status NOT IN ('not_applicable', 'unknown') THEN
       v_req_weighted_sum := v_req_weighted_sum + (r.weight * (v_score_contribution / 100.00));
       v_req_total_weight := v_req_total_weight + r.weight;
-    ELSIF r.requirement_scope = 'preferred' AND v_res_status <> 'not_applicable' THEN
+    ELSIF r.requirement_scope = 'preferred' AND v_res_status NOT IN ('not_applicable', 'unknown') THEN
       v_pref_weighted_sum := v_pref_weighted_sum + (r.weight * (v_score_contribution / 100.00));
       v_pref_total_weight := v_pref_total_weight + r.weight;
     END IF;
@@ -755,6 +770,9 @@ BEGIN
   -- 7. Compute deterministic category and overall scores
   IF v_req_total_weight > 0 THEN
     v_required_score := ROUND(((v_req_weighted_sum / v_req_total_weight) * 100.00), 2);
+  ELSIF v_requirement_count > 0 THEN
+    -- When required criteria exist but all are unknown or not applicable, score is 0.00
+    v_required_score := 0.00;
   ELSE
     v_required_score := 100.00;
   END IF;
@@ -795,6 +813,7 @@ BEGIN
       'satisfied', v_satisfied_count,
       'partial', v_partial_count,
       'missing', v_missing_count,
+      'unknown', v_unknown_count,
       'blocking', v_blocking_count
     ),
     'eligibility', jsonb_build_object(
@@ -804,18 +823,21 @@ BEGIN
     'calculated_at', now()
   );
 
-  -- 9. Insert evaluation record
+  -- 9. Insert evaluation record (enforce target exclusivity: role_id NULL for opening)
   INSERT INTO public.readiness_evaluations (
     student_id, target_type, role_id, job_opening_id,
     status, overall_score, required_score, preferred_score,
     is_eligible, has_unresolved_blocking,
-    requirement_count, satisfied_count, partial_count, missing_count, blocking_count,
+    requirement_count, satisfied_count, partial_count, missing_count, unknown_count, blocking_count,
     engine_version, snapshot
   ) VALUES (
-    p_student_id, p_target_type, v_target_role_id, v_target_opening_id,
+    p_student_id,
+    p_target_type,
+    CASE WHEN p_target_type = 'role' THEN v_target_role_id ELSE NULL END,
+    CASE WHEN p_target_type = 'job_opening' THEN v_target_opening_id ELSE NULL END,
     'completed', v_overall_score, v_required_score, v_preferred_score,
     v_is_eligible, v_has_unresolved_blocking,
-    v_requirement_count, v_satisfied_count, v_partial_count, v_missing_count, v_blocking_count,
+    v_requirement_count, v_satisfied_count, v_partial_count, v_missing_count, v_unknown_count, v_blocking_count,
     v_engine_version, v_snapshot
   ) RETURNING id INTO v_evaluation_id;
 
@@ -947,7 +969,7 @@ CREATE POLICY career_requirements_delete_policy ON public.career_requirements
   FOR DELETE
   USING (public.is_admin() OR public.has_role('data_editor') OR public.has_role('verifier'));
 
--- 9.5 readiness_evaluations Policies (Student Ownership Isolation)
+-- 9.5 readiness_evaluations Policies (Historical Snapshot Immutability)
 DROP POLICY IF EXISTS readiness_evaluations_select_policy ON public.readiness_evaluations;
 CREATE POLICY readiness_evaluations_select_policy ON public.readiness_evaluations
   FOR SELECT
@@ -961,31 +983,21 @@ DROP POLICY IF EXISTS readiness_evaluations_insert_policy ON public.readiness_ev
 CREATE POLICY readiness_evaluations_insert_policy ON public.readiness_evaluations
   FOR INSERT
   WITH CHECK (
-    student_id = public.get_current_student_id()
-    OR public.is_admin()
+    public.is_admin()
   );
 
 DROP POLICY IF EXISTS readiness_evaluations_update_policy ON public.readiness_evaluations;
 CREATE POLICY readiness_evaluations_update_policy ON public.readiness_evaluations
   FOR UPDATE
-  USING (
-    student_id = public.get_current_student_id()
-    OR public.is_admin()
-  )
-  WITH CHECK (
-    student_id = public.get_current_student_id()
-    OR public.is_admin()
-  );
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
 
 DROP POLICY IF EXISTS readiness_evaluations_delete_policy ON public.readiness_evaluations;
 CREATE POLICY readiness_evaluations_delete_policy ON public.readiness_evaluations
   FOR DELETE
-  USING (
-    student_id = public.get_current_student_id()
-    OR public.is_admin()
-  );
+  USING (public.is_admin());
 
--- 9.6 readiness_requirement_results Policies (Student Ownership Isolation)
+-- 9.6 readiness_requirement_results Policies (Historical Snapshot Immutability)
 DROP POLICY IF EXISTS readiness_req_results_select_policy ON public.readiness_requirement_results;
 CREATE POLICY readiness_req_results_select_policy ON public.readiness_requirement_results
   FOR SELECT
@@ -999,37 +1011,29 @@ DROP POLICY IF EXISTS readiness_req_results_insert_policy ON public.readiness_re
 CREATE POLICY readiness_req_results_insert_policy ON public.readiness_requirement_results
   FOR INSERT
   WITH CHECK (
-    student_id = public.get_current_student_id()
-    OR public.is_admin()
+    public.is_admin()
   );
 
 DROP POLICY IF EXISTS readiness_req_results_update_policy ON public.readiness_requirement_results;
 CREATE POLICY readiness_req_results_update_policy ON public.readiness_requirement_results
   FOR UPDATE
-  USING (
-    student_id = public.get_current_student_id()
-    OR public.is_admin()
-  )
-  WITH CHECK (
-    student_id = public.get_current_student_id()
-    OR public.is_admin()
-  );
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
 
 DROP POLICY IF EXISTS readiness_req_results_delete_policy ON public.readiness_requirement_results;
 CREATE POLICY readiness_req_results_delete_policy ON public.readiness_requirement_results
   FOR DELETE
-  USING (
-    student_id = public.get_current_student_id()
-    OR public.is_admin()
-  );
+  USING (public.is_admin());
 
 -- ── 10. Permissions & Grants ────────────────────────────────────────────────
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.companies TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.roles TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.job_openings TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.career_requirements TO authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.readiness_evaluations TO authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.readiness_requirement_results TO authenticated;
+
+-- Historical snapshot tables: students have SELECT only; direct writes restricted to admin
+GRANT SELECT ON public.readiness_evaluations TO authenticated;
+GRANT SELECT ON public.readiness_requirement_results TO authenticated;
 
 REVOKE ALL ON FUNCTION public.resolve_effective_requirements(VARCHAR, UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.resolve_effective_requirements(VARCHAR, UUID) TO authenticated;

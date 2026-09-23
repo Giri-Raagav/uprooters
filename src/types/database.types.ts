@@ -1285,6 +1285,7 @@ export interface Database {
           satisfied_count: number
           partial_count: number
           missing_count: number
+          unknown_count: number
           blocking_count: number
           engine_version: string
           calculated_at: string
@@ -1308,6 +1309,7 @@ export interface Database {
           satisfied_count?: number
           partial_count?: number
           missing_count?: number
+          unknown_count?: number
           blocking_count?: number
           engine_version?: string
           calculated_at?: string
@@ -1331,6 +1333,7 @@ export interface Database {
           satisfied_count?: number
           partial_count?: number
           missing_count?: number
+          unknown_count?: number
           blocking_count?: number
           engine_version?: string
           calculated_at?: string

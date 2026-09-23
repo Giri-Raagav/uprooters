@@ -78,7 +78,8 @@ describe('Milestone 09 — Readiness Engine (Migration 007)', () => {
       expect(migrationSql).toMatch(/employment_type\s+VARCHAR\(50\)\s+NOT\s+NULL\s+DEFAULT\s+'full_time'\s+CHECK\s*\(\s*employment_type\s+IN\s*\(\s*'full_time',\s*'internship',\s*'contract',\s*'co_op'\s*\)\s*\)/i)
       expect(migrationSql).toContain("source_url ~* '^https?://[^\\s]+$'")
       expect(migrationSql).toMatch(/status\s+VARCHAR\(20\)\s+NOT\s+NULL\s+DEFAULT\s+'published'\s+CHECK\s*\(\s*status\s+IN\s*\(\s*'draft',\s*'published',\s*'closed',\s*'archived',\s*'stale'\s*\)\s*\)/i)
-      expect(migrationSql).toMatch(/closing_date\s+DATE\s+CHECK\s*\(\s*closing_date\s+IS\s+NULL\s+OR\s+closing_date\s*>=\s*CURRENT_DATE\s*\)/i)
+      expect(migrationSql).toMatch(/closing_date\s+DATE\s+CHECK\s*\(\s*closing_date\s+IS\s+NULL\s+OR\s+closing_date\s*>=\s*published_at::date\s*\)/i)
+      expect(migrationSql).not.toContain('closing_date >= CURRENT_DATE')
     })
 
     it('attaches updated_at trigger and foreign key indexes to public.job_openings', () => {
@@ -107,7 +108,7 @@ describe('Milestone 09 — Readiness Engine (Migration 007)', () => {
     })
 
     it('enforces target exclusivity constraint on public.career_requirements', () => {
-      expect(migrationSql).toMatch(/CONSTRAINT\s+career_requirements_target_check\s+CHECK\s*\(\s*\(\s*target_type\s*=\s*'role'\s+AND\s+role_id\s+IS\s+NOT\s+NULL\s+AND\s+job_opening_id\s+IS\s+NULL\s*\)\s+OR\s+\(\s*target_type\s*=\s*'job_opening'\s+AND\s+job_opening_id\s+IS\s+NOT\s+NULL\s*\)\s*\)/i)
+      expect(migrationSql).toMatch(/CONSTRAINT\s+career_requirements_target_check\s+CHECK\s*\(\s*\(\s*target_type\s*=\s*'role'\s+AND\s+role_id\s+IS\s+NOT\s+NULL\s+AND\s+job_opening_id\s+IS\s+NULL\s*\)\s+OR\s+\(\s*target_type\s*=\s*'job_opening'\s+AND\s+job_opening_id\s+IS\s+NOT\s+NULL\s+AND\s+role_id\s+IS\s+NULL\s*\)\s*\)/i)
     })
 
     it('enforces skill_id presence when requirement_type is skill', () => {
@@ -125,9 +126,10 @@ describe('Milestone 09 — Readiness Engine (Migration 007)', () => {
       expect(migrationSql).toMatch(/preferred_score\s+NUMERIC\(5,\s*2\)\s+NOT\s+NULL\s+CHECK\s*\(\s*preferred_score\s*>=\s*0\s+AND\s+preferred_score\s*<=\s*100\s*\)/i)
       expect(migrationSql).toMatch(/is_eligible\s+BOOLEAN\s+NOT\s+NULL\s+DEFAULT\s+true/i)
       expect(migrationSql).toMatch(/has_unresolved_blocking\s+BOOLEAN\s+NOT\s+NULL\s+DEFAULT\s+false/i)
+      expect(migrationSql).toMatch(/unknown_count\s+INT\s+NOT\s+NULL\s+DEFAULT\s+0\s+CHECK\s*\(\s*unknown_count\s*>=\s*0\s*\)/i)
       expect(migrationSql).toMatch(/engine_version\s+VARCHAR\(20\)\s+NOT\s+NULL\s+DEFAULT\s+'1\.0\.0'/i)
       expect(migrationSql).toMatch(/snapshot\s+JSONB\s+NOT\s+NULL\s+DEFAULT\s+'\{\}'::jsonb/i)
-      expect(migrationSql).toMatch(/CONSTRAINT\s+readiness_evaluations_target_check/i)
+      expect(migrationSql).toMatch(/CONSTRAINT\s+readiness_evaluations_target_check\s+CHECK\s*\(\s*\(\s*target_type\s*=\s*'role'\s+AND\s+role_id\s+IS\s+NOT\s+NULL\s+AND\s+job_opening_id\s+IS\s+NULL\s*\)\s+OR\s+\(\s*target_type\s*=\s*'job_opening'\s+AND\s+job_opening_id\s+IS\s+NOT\s+NULL\s+AND\s+role_id\s+IS\s+NULL\s*\)\s*\)/i)
       expect(migrationSql).toMatch(/CONSTRAINT\s+readiness_evaluations_id_student_key\s+UNIQUE\s*\(\s*id,\s*student_id\s*\)/i)
     })
   })
@@ -182,6 +184,11 @@ describe('Milestone 09 — Readiness Engine (Migration 007)', () => {
       expect(funcBody).toMatch(/role_reqs\s+AS\s*\(/i)
       expect(funcBody).toMatch(/NOT\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+opening_reqs/i)
       expect(funcBody).toMatch(/is_inherited/i)
+    })
+
+    it('documents explicit semantics: role-level eligibility fields are descriptive metadata while career_requirements is authoritative', () => {
+      expect(migrationSql).toMatch(/Role-level eligibility fields[\s\S]*?descriptive metadata/i)
+      expect(migrationSql).toMatch(/Authoritative criteria evaluated by the readiness engine are registered in[\s\S]*?public\.career_requirements/i)
     })
   })
 
@@ -242,6 +249,15 @@ describe('Milestone 09 — Readiness Engine (Migration 007)', () => {
       expect(evalFuncBody).toMatch(/v_blocking_count\s*:=\s*v_blocking_count\s*\+\s*1;/i)
     })
 
+    it('awards 50% partial numerical score contribution for exact unverified evidence', () => {
+      expect(evalFuncBody).toMatch(/v_res_status\s*:=\s*'partially_met';\s*v_match_type\s*:=\s*'exact';\s*v_ev_status\s*:=\s*'unverified';\s*v_score_contribution\s*:=\s*50\.00;/i)
+    })
+
+    it('treats UNKNOWN by excluding it from scoring denominators to avoid penalizing incomplete data as absence', () => {
+      expect(evalFuncBody).toMatch(/v_res_status\s+NOT\s+IN\s*\(\s*'not_applicable',\s*'unknown'\s*\)/i)
+      expect(evalFuncBody).toMatch(/v_unknown_count\s*:=\s*v_unknown_count\s*\+\s*1;/i)
+    })
+
     it('persists point-in-time calculation snapshot JSONB with version, config, counts, and eligibility', () => {
       expect(evalFuncBody).toMatch(/v_snapshot\s*:=\s*jsonb_build_object\(/i)
       expect(evalFuncBody).toMatch(/'engine_version',\s*v_engine_version/i)
@@ -249,12 +265,13 @@ describe('Milestone 09 — Readiness Engine (Migration 007)', () => {
       expect(evalFuncBody).toMatch(/'required_weight',\s*v_w_req/i)
       expect(evalFuncBody).toMatch(/'preferred_weight',\s*v_w_pref/i)
       expect(evalFuncBody).toMatch(/'related_skill_score_credit',\s*v_related_credit/i)
+      expect(evalFuncBody).toMatch(/'unknown',\s*v_unknown_count/i)
       expect(evalFuncBody).toMatch(/'is_eligible',\s*v_is_eligible/i)
       expect(evalFuncBody).toMatch(/'has_unresolved_blocking',\s*v_has_unresolved_blocking/i)
     })
   })
 
-  describe('9. Non-Recursive Row-Level Security & Policies (§27–§31, Security Model)', () => {
+  describe('9. Non-Recursive Row-Level Security & Snapshot Immutability (§27–§31, Security Model)', () => {
     it('enables RLS on all six readiness engine tables', () => {
       expect(migrationSql).toMatch(/ALTER\s+TABLE\s+public\.companies\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY;/i)
       expect(migrationSql).toMatch(/ALTER\s+TABLE\s+public\.roles\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY;/i)
@@ -264,14 +281,29 @@ describe('Milestone 09 — Readiness Engine (Migration 007)', () => {
       expect(migrationSql).toMatch(/ALTER\s+TABLE\s+public\.readiness_requirement_results\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY;/i)
     })
 
-    it('enforces student ownership isolation on readiness_evaluations and requirement_results', () => {
+    it('enforces student ownership isolation on readiness_evaluations and requirement_results SELECT', () => {
       expect(migrationSql).toMatch(/CREATE\s+POLICY\s+readiness_evaluations_select_policy\s+ON\s+public\.readiness_evaluations\s+FOR\s+SELECT\s+USING\s*\(\s*student_id\s*=\s*public\.get_current_student_id\(\)\s+OR\s+public\.is_admin\(\)\s+OR\s+public\.has_role\('verifier'\)\s*\)/i)
       expect(migrationSql).toMatch(/CREATE\s+POLICY\s+readiness_req_results_select_policy\s+ON\s+public\.readiness_requirement_results\s+FOR\s+SELECT\s+USING\s*\(\s*student_id\s*=\s*public\.get_current_student_id\(\)\s+OR\s+public\.is_admin\(\)\s+OR\s+public\.has_role\('verifier'\)\s*\)/i)
     })
 
-    it('restricts evaluation mutations strictly to student owner or admin', () => {
-      expect(migrationSql).toMatch(/CREATE\s+POLICY\s+readiness_evaluations_insert_policy\s+ON\s+public\.readiness_evaluations\s+FOR\s+INSERT\s+WITH\s+CHECK\s*\(\s*student_id\s*=\s*public\.get_current_student_id\(\)\s+OR\s+public\.is_admin\(\)\s*\)/i)
-      expect(migrationSql).toMatch(/CREATE\s+POLICY\s+readiness_req_results_insert_policy\s+ON\s+public\.readiness_requirement_results\s+FOR\s+INSERT\s+WITH\s+CHECK\s*\(\s*student_id\s*=\s*public\.get_current_student_id\(\)\s+OR\s+public\.is_admin\(\)\s*\)/i)
+    it('enforces snapshot immutability: evaluations and requirement results are NOT student-updatable', () => {
+      expect(migrationSql).toMatch(/CREATE\s+POLICY\s+readiness_evaluations_update_policy\s+ON\s+public\.readiness_evaluations\s+FOR\s+UPDATE\s+USING\s*\(\s*public\.is_admin\(\)\s*\)\s+WITH\s+CHECK\s*\(\s*public\.is_admin\(\)\s*\)/i)
+      expect(migrationSql).toMatch(/CREATE\s+POLICY\s+readiness_req_results_update_policy\s+ON\s+public\.readiness_requirement_results\s+FOR\s+UPDATE\s+USING\s*\(\s*public\.is_admin\(\)\s*\)\s+WITH\s+CHECK\s*\(\s*public\.is_admin\(\)\s*\)/i)
+
+      const evalUpdatePolicy = migrationSql.match(/CREATE\s+POLICY\s+readiness_evaluations_update_policy[^;]+;/i)?.[0] || ''
+      const reqResultUpdatePolicy = migrationSql.match(/CREATE\s+POLICY\s+readiness_req_results_update_policy[^;]+;/i)?.[0] || ''
+      expect(evalUpdatePolicy).not.toContain('get_current_student_id')
+      expect(reqResultUpdatePolicy).not.toContain('get_current_student_id')
+    })
+
+    it('enforces snapshot immutability: evaluations and requirement results are NOT student-deletable', () => {
+      expect(migrationSql).toMatch(/CREATE\s+POLICY\s+readiness_evaluations_delete_policy\s+ON\s+public\.readiness_evaluations\s+FOR\s+DELETE\s+USING\s*\(\s*public\.is_admin\(\)\s*\)/i)
+      expect(migrationSql).toMatch(/CREATE\s+POLICY\s+readiness_req_results_delete_policy\s+ON\s+public\.readiness_requirement_results\s+FOR\s+DELETE\s+USING\s*\(\s*public\.is_admin\(\)\s*\)/i)
+
+      const evalDeletePolicy = migrationSql.match(/CREATE\s+POLICY\s+readiness_evaluations_delete_policy[^;]+;/i)?.[0] || ''
+      const reqResultDeletePolicy = migrationSql.match(/CREATE\s+POLICY\s+readiness_req_results_delete_policy[^;]+;/i)?.[0] || ''
+      expect(evalDeletePolicy).not.toContain('get_current_student_id')
+      expect(reqResultDeletePolicy).not.toContain('get_current_student_id')
     })
   })
 
@@ -281,6 +313,13 @@ describe('Milestone 09 — Readiness Engine (Migration 007)', () => {
       expect(migrationSql).toMatch(/GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+public\.resolve_effective_requirements\s*\(\s*VARCHAR,\s*UUID\s*\)\s+TO\s+authenticated;/i)
       expect(migrationSql).toMatch(/REVOKE\s+ALL\s+ON\s+FUNCTION\s+public\.evaluate_student_readiness\s*\(\s*UUID,\s*VARCHAR,\s*UUID,\s*JSONB\s*\)\s+FROM\s+PUBLIC;/i)
       expect(migrationSql).toMatch(/GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+public\.evaluate_student_readiness\s*\(\s*UUID,\s*VARCHAR,\s*UUID,\s*JSONB\s*\)\s+TO\s+authenticated;/i)
+    })
+
+    it('grants SELECT only to authenticated for historical snapshot tables', () => {
+      expect(migrationSql).toMatch(/GRANT\s+SELECT\s+ON\s+public\.readiness_evaluations\s+TO\s+authenticated;/i)
+      expect(migrationSql).toMatch(/GRANT\s+SELECT\s+ON\s+public\.readiness_requirement_results\s+TO\s+authenticated;/i)
+      expect(migrationSql).not.toMatch(/GRANT\s+[^;]*?(?:INSERT|UPDATE|DELETE)\s+ON\s+public\.readiness_evaluations\s+TO\s+authenticated/i)
+      expect(migrationSql).not.toMatch(/GRANT\s+[^;]*?(?:INSERT|UPDATE|DELETE)\s+ON\s+public\.readiness_requirement_results\s+TO\s+authenticated/i)
     })
   })
 
@@ -377,7 +416,7 @@ describe('Milestone 09 — Readiness Engine (Migration 007)', () => {
         id: '66666666-6666-6666-6666-666666666666',
         student_id: '77777777-7777-7777-7777-777777777777',
         target_type: 'job_opening' as TargetType,
-        role_id: mockRole.id,
+        role_id: null,
         job_opening_id: mockOpening.id,
         status: 'completed' as ReadinessEvaluationStatus,
         overall_score: 92.5,
@@ -389,6 +428,7 @@ describe('Milestone 09 — Readiness Engine (Migration 007)', () => {
         satisfied_count: 4,
         partial_count: 1,
         missing_count: 0,
+        unknown_count: 0,
         blocking_count: 0,
         engine_version: '1.0.0',
         calculated_at: new Date().toISOString(),
