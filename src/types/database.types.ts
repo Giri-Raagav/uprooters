@@ -4,6 +4,7 @@
 -- Synced with:
 --   - supabase/migrations/001_initial_schema.sql
 --   - supabase/migrations/002_seed_phase1_taxonomy.sql
+--   - supabase/migrations/003_student_profile.sql
 -- Spec references:
 --   docs/05_DATABASE_SPEC.md (§3–§12, §19–§22, §76–§78)
 --   docs/07_SECURITY_MODEL.md (§6–§15, §17, §24)
@@ -40,6 +41,40 @@ export type SkillCategory =
   | 'SOFTWARE'
   | 'TOOLS'
   | 'OTHER'
+
+export interface StudentProfileViewRow {
+  id: string
+  user_id: string
+  college_id: string
+  college_name: string
+  college_city: string
+  college_state: string
+  department_id: string | null
+  department_name: string | null
+  department_short_name: string | null
+  first_name: string
+  last_name: string
+  display_name: string
+  degree: string
+  branch: string
+  admission_year: number
+  expected_graduation_year: number
+  current_semester: number
+  date_of_birth: string | null
+  profile_photo_url: string | null
+  bio: string | null
+  location: string | null
+  country: string
+  phone_number: string | null
+  github_url: string | null
+  linkedin_url: string | null
+  portfolio_url: string | null
+  career_interests: string[]
+  profile_completed: boolean
+  profile_completion_percentage: number
+  created_at: string
+  updated_at: string
+}
 
 export interface Database {
   public: {
@@ -166,7 +201,13 @@ export interface Database {
           bio: string | null
           location: string | null
           country: string
+          phone_number: string | null
+          github_url: string | null
+          linkedin_url: string | null
+          portfolio_url: string | null
+          career_interests: string[]
           profile_completed: boolean
+          profile_completion_percentage: number
           is_active: boolean
           created_at: string
           updated_at: string
@@ -189,7 +230,13 @@ export interface Database {
           bio?: string | null
           location?: string | null
           country?: string
+          phone_number?: string | null
+          github_url?: string | null
+          linkedin_url?: string | null
+          portfolio_url?: string | null
+          career_interests?: string[]
           profile_completed?: boolean
+          profile_completion_percentage?: number
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -212,7 +259,13 @@ export interface Database {
           bio?: string | null
           location?: string | null
           country?: string
+          phone_number?: string | null
+          github_url?: string | null
+          linkedin_url?: string | null
+          portfolio_url?: string | null
+          career_interests?: string[]
           profile_completed?: boolean
+          profile_completion_percentage?: number
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -311,7 +364,23 @@ export interface Database {
       }
     }
     Views: {
-      [_ in never]: never
+      student_profiles_view: {
+        Row: StudentProfileViewRow
+        Relationships: [
+          {
+            foreignKeyName: 'students_college_id_fkey'
+            columns: ['college_id']
+            referencedRelation: 'colleges'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'students_department_id_fkey'
+            columns: ['department_id']
+            referencedRelation: 'departments'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Functions: {
       has_role: {
@@ -325,6 +394,10 @@ export interface Database {
       get_current_student_id: {
         Args: Record<PropertyKey, never>
         Returns: string | null
+      }
+      get_current_student_profile: {
+        Args: Record<PropertyKey, never>
+        Returns: StudentProfileViewRow[]
       }
     }
     Enums: {
