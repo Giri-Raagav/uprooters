@@ -14,10 +14,10 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<ButtonVariant, string> = {
-  primary:   'bg-brand-wine text-white hover:bg-brand-wine-light active:bg-brand-wine-dark shadow-sm hover:shadow-md disabled:bg-slate-300 disabled:text-slate-500',
+  primary: 'bg-brand-wine text-white hover:bg-brand-wine-light active:bg-brand-wine-dark shadow-sm hover:shadow-md disabled:bg-slate-300 disabled:text-slate-500',
   secondary: 'border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--surface-overlay)] active:bg-[var(--surface-sunken)] disabled:text-[var(--text-muted)]',
-  ghost:     'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-overlay)] active:bg-[var(--surface-sunken)] disabled:text-[var(--text-muted)]',
-  danger:    'bg-red-600 text-white hover:bg-red-700 active:bg-red-800 shadow-sm hover:shadow-md disabled:bg-slate-300 disabled:text-slate-500',
+  ghost: 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-overlay)] active:bg-[var(--surface-sunken)] disabled:text-[var(--text-muted)]',
+  danger: 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800 shadow-sm hover:shadow-md disabled:bg-slate-300 disabled:text-slate-500',
 }
 
 const sizeClasses: Record<ButtonSize, string> = {

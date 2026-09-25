@@ -95,6 +95,23 @@ export const studentService = {
   /**
    * Fetch student's claimed and established skills with canonical metadata.
    */
+  /**
+   * Fetch the canonical skill catalog available to students.
+   */
+  async getCanonicalSkills() {
+    const { data, error } = await supabase
+      .from('skills')
+      .select('*')
+      .eq('status', 'active')
+      .order('name', { ascending: true })
+
+    if (error) {
+      console.warn('studentService.getCanonicalSkills error', error)
+      return []
+    }
+
+    return data || []
+  },
   async getSkills(studentId: string) {
     const { data, error } = await supabase
       .from('student_skills')
@@ -153,6 +170,24 @@ export const studentService = {
     return data || []
   },
 
+  /**
+   * Submit evidence for a student's canonical skill.
+   */
+  async addSkillEvidence(
+    evidence: Database['public']['Tables']['skill_evidence']['Insert']
+  ) {
+    const { data, error } = await (supabase.from('skill_evidence') as any)
+      .insert(evidence)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('studentService.addSkillEvidence failed', error)
+      throw error
+    }
+
+    return data
+  },
   /**
    * Fetch student projects.
    */
@@ -292,3 +327,4 @@ export const studentService = {
     return true
   },
 }
+
