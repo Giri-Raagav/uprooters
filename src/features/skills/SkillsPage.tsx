@@ -15,6 +15,8 @@ export const SkillsPage: React.FC = () => {
   const [canonicalSkills, setCanonicalSkills] = useState<any[]>([])
   const [selectedSkillId, setSelectedSkillId] = useState('')
   const [proficiency, setProficiency] = useState('beginner')
+  const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadSkills() {
@@ -84,16 +86,19 @@ export const SkillsPage: React.FC = () => {
 
         <div className="flex items-center gap-2">
           <Badge variant="default">
-            {skills.length} Claimed Skills
+            {skills.length} Total Skills
           </Badge>
 
-          <Badge variant="success">
+          <Badge variant="verified">
             {skills.filter((s) => s.status === 'verified').length} Verified
           </Badge>
 
           <Button
             size="sm"
-            onClick={() => setShowAddSkill(true)}
+            onClick={() => {
+              setFormError(null)
+              setShowAddSkill(true)
+            }}
           >
             <Plus className="w-4 h-4" />
             Add Skill
@@ -109,7 +114,7 @@ export const SkillsPage: React.FC = () => {
               onClick={() => setSelectedCategory(cat)}
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg capitalize transition-colors ${
                 selectedCategory === cat
-                  ? 'bg-primary text-white'
+                  ? 'bg-brand-wine text-white'
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
               }`}
             >
@@ -123,7 +128,7 @@ export const SkillsPage: React.FC = () => {
           placeholder="Search skills..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full sm:w-64 px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-primary"
+          className="w-full sm:w-64 px-3 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-wine"
         />
       </div>
 
@@ -161,7 +166,7 @@ export const SkillsPage: React.FC = () => {
                 <Badge
                   variant={
                     s.status === 'verified'
-                      ? 'success'
+                      ? 'verified'
                       : s.status === 'supported'
                         ? 'info'
                         : 'default'
@@ -205,11 +210,22 @@ export const SkillsPage: React.FC = () => {
                 setShowAddSkill(false)
                 setSelectedSkillId('')
                 setProficiency('beginner')
+                setFormError(null)
               }}
             >
               Cancel
             </Button>
           </div>
+
+          {formError && (
+            <div
+              role="alert"
+              aria-live="polite"
+              className="p-3 text-xs bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 rounded-lg border border-red-200 dark:border-red-900"
+            >
+              {formError}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <label className="space-y-2">
@@ -249,12 +265,19 @@ export const SkillsPage: React.FC = () => {
 
           <div className="flex justify-end">
             <Button
-              disabled={!selectedSkillId}
+              disabled={!selectedSkillId || submitting}
+              loading={submitting}
               onClick={async () => {
+                if (!selectedSkillId || submitting) return
                 try {
-                  const profile = await studentService.getCurrentProfile()
+                  setSubmitting(true)
+                  setFormError(null)
 
-                  if (!profile || !selectedSkillId) return
+                  const profile = await studentService.getCurrentProfile()
+                  if (!profile) {
+                    setFormError('Student profile not found. Please complete profile setup first.')
+                    return
+                  }
 
                   await studentService.upsertSkill(
                     profile.id,
@@ -270,6 +293,9 @@ export const SkillsPage: React.FC = () => {
                   setShowAddSkill(false)
                 } catch (err) {
                   console.error('Failed to add skill', err)
+                  setFormError('Unable to save this skill right now. Please try again.')
+                } finally {
+                  setSubmitting(false)
                 }
               }}
             >
@@ -283,4 +309,3 @@ export const SkillsPage: React.FC = () => {
 }
 
 export default SkillsPage
-
