@@ -82,7 +82,7 @@ export const readinessService = {
         career_requirements (*)
       `)
       .eq('evaluation_id', evaluationId)
-      .order('weight', { ascending: false })
+      .order('score_contribution', { ascending: false })
 
     if (error) {
       console.warn('readinessService.getRequirementResults error', error)

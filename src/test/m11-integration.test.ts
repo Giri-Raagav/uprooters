@@ -161,6 +161,43 @@ describe('Milestone 11 — End-to-End Integration & Boundary Verification', () =
       })
       expect(count).toBe(3)
     })
+
+    it('readinessService.getRequirementResults queries readiness_requirement_results ordered by score_contribution', async () => {
+      const mockResultRows = [
+        {
+          id: 'res-uuid-1',
+          evaluation_id: 'eval-uuid-1',
+          requirement_id: 'req-uuid-1',
+          requirement_type: 'skill',
+          requirement_scope: 'required',
+          result_status: 'met',
+          score_contribution: 25.0,
+          career_requirements: { id: 'req-uuid-1', title: 'Embedded C' },
+        },
+      ]
+
+      const mockQueryChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        order: vi.fn().mockResolvedValue({
+          data: mockResultRows,
+          error: null,
+        }),
+      }
+
+      const fromSpy = vi.spyOn(supabase, 'from').mockReturnValue(mockQueryChain as any)
+
+      const results = await readinessService.getRequirementResults('eval-uuid-1')
+
+      expect(fromSpy).toHaveBeenCalledWith('readiness_requirement_results')
+      expect(mockQueryChain.select).toHaveBeenCalledWith(`
+        *,
+        career_requirements (*)
+      `)
+      expect(mockQueryChain.eq).toHaveBeenCalledWith('evaluation_id', 'eval-uuid-1')
+      expect(mockQueryChain.order).toHaveBeenCalledWith('score_contribution', { ascending: false })
+      expect(results).toEqual(mockResultRows)
+    })
   })
 
   // ── Acceptance Test 10: Freshness Automation Invariants ───────────────────
