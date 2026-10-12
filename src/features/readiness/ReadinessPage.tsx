@@ -392,7 +392,7 @@ export const ReadinessPage: React.FC = () => {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">
-                        {res.title}
+                        {res.career_requirements?.title || res.requirement_type}
                       </h4>
                       {res.is_blocking && (
                         <Badge variant="error" className="text-[10px]">
