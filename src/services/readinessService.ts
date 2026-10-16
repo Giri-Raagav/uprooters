@@ -72,6 +72,30 @@ export const readinessService = {
   },
 
   /**
+   * Fetch a specific readiness evaluation snapshot by ID.
+   */
+  async getEvaluationById(evaluationId: string) {
+    const { data, error } = await supabase
+      .from('readiness_evaluations')
+      .select(`
+        *,
+        roles (*),
+        job_openings (
+          *,
+          companies (*)
+        )
+      `)
+      .eq('id', evaluationId)
+      .maybeSingle()
+
+    if (error) {
+      console.warn('readinessService.getEvaluationById error', error)
+      return null
+    }
+    return data || null
+  },
+
+  /**
    * Fetch requirement-level results for a specific completed evaluation snapshot.
    */
   async getRequirementResults(evaluationId: string) {

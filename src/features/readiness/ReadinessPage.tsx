@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import {
   Compass,
@@ -39,9 +39,24 @@ export const ReadinessPage: React.FC = () => {
   const [evaluation, setEvaluation] = useState<any | null>(null)
   const [requirementResults, setRequirementResults] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingEvaluation, setLoadingEvaluation] = useState(false)
   const [evaluating, setEvaluating] = useState(false)
   const [generatingRecs, setGeneratingRecs] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  const currentTargetRef = useRef({
+    type: selectedTargetType,
+    id: selectedTargetId,
+  })
+  const evalRequestIdRef = useRef(0)
+  const savedLoadIdRef = useRef(0)
+
+  useEffect(() => {
+    currentTargetRef.current = {
+      type: selectedTargetType,
+      id: selectedTargetId,
+    }
+  }, [selectedTargetType, selectedTargetId])
 
   useEffect(() => {
     async function init() {
@@ -85,15 +100,6 @@ export const ReadinessPage: React.FC = () => {
               setSelectedTargetId(targetId)
             }
           }
-
-          if (targetId) {
-            const latest = await readinessService.getLatestEvaluation(profile.id, targetType, targetId)
-            if (latest) {
-              setEvaluation(latest)
-              const results = await readinessService.getRequirementResults((latest as any).id)
-              setRequirementResults(results)
-            }
-          }
         }
       } catch (err) {
         console.warn('Readiness init error', err)
@@ -105,35 +111,129 @@ export const ReadinessPage: React.FC = () => {
     init()
   }, [])
 
+  useEffect(() => {
+    let isCurrent = true
+    const loadId = ++savedLoadIdRef.current
+
+    async function loadTargetEvaluation() {
+      if (!currentStudentId || !selectedTargetId) {
+        if (!isCurrent || loadId !== savedLoadIdRef.current) return
+        setEvaluation(null)
+        setRequirementResults([])
+        setLoadingEvaluation(false)
+        setEvaluating(false)
+        return
+      }
+
+      setLoadingEvaluation(true)
+      setEvaluation(null)
+      setRequirementResults([])
+      setErrorMsg(null)
+      setEvaluating(false)
+
+      try {
+        const latest = await readinessService.getLatestEvaluation(
+          currentStudentId,
+          selectedTargetType,
+          selectedTargetId
+        )
+
+        if (!isCurrent || loadId !== savedLoadIdRef.current) return
+
+        if (latest) {
+          const results = await readinessService.getRequirementResults((latest as any).id)
+          if (!isCurrent || loadId !== savedLoadIdRef.current) return
+
+          setEvaluation(latest)
+          setRequirementResults(results)
+        } else {
+          setEvaluation(null)
+          setRequirementResults([])
+        }
+      } catch (err) {
+        if (!isCurrent || loadId !== savedLoadIdRef.current) return
+        console.warn('Failed to load target evaluation', err)
+        setEvaluation(null)
+        setRequirementResults([])
+      } finally {
+        if (isCurrent && loadId === savedLoadIdRef.current) {
+          setLoadingEvaluation(false)
+        }
+      }
+    }
+
+    loadTargetEvaluation()
+
+    return () => {
+      isCurrent = false
+    }
+  }, [currentStudentId, selectedTargetType, selectedTargetId])
+
   const handleEvaluate = async () => {
     if (!currentStudentId || !selectedTargetId) {
       setErrorMsg('Please select a career target to evaluate.')
       return
     }
 
+    // Invalidate any in-flight saved-evaluation load and clear loading state
+    savedLoadIdRef.current++
+    setLoadingEvaluation(false)
+
+    const targetType = selectedTargetType
+    const targetId = selectedTargetId
+    const requestId = ++evalRequestIdRef.current
+
     setEvaluating(true)
     setErrorMsg(null)
     try {
       const evalId = await readinessService.evaluateReadiness(
         currentStudentId,
-        selectedTargetType,
-        selectedTargetId
+        targetType,
+        targetId
       )
 
-      const latest = await readinessService.getLatestEvaluation(
-        currentStudentId,
-        selectedTargetType,
-        selectedTargetId
-      )
-      setEvaluation(latest)
+      const evalData = await readinessService.getEvaluationById(evalId)
+
+      // Guard: if evaluation record was not found, do not apply requirements or corrupt UI
+      if (!evalData) {
+        if (
+          currentTargetRef.current.type === targetType &&
+          currentTargetRef.current.id === targetId &&
+          requestId === evalRequestIdRef.current
+        ) {
+          setErrorMsg('Unable to retrieve the recalculated evaluation record. Please try again.')
+          setEvaluation(null)
+          setRequirementResults([])
+        }
+        return
+      }
 
       const results = await readinessService.getRequirementResults(evalId)
+
+      // Guard against obsolete selection if target changed or newer recalculation started
+      if (
+        currentTargetRef.current.type !== targetType ||
+        currentTargetRef.current.id !== targetId ||
+        requestId !== evalRequestIdRef.current
+      ) {
+        return
+      }
+
+      setEvaluation(evalData)
       setRequirementResults(results)
     } catch (err: any) {
-      console.error('Readiness evaluation failed', err)
-      setErrorMsg(err.message || 'Evaluation calculation failed. Please try again.')
+      if (
+        currentTargetRef.current.type === targetType &&
+        currentTargetRef.current.id === targetId &&
+        requestId === evalRequestIdRef.current
+      ) {
+        console.error('Readiness evaluation failed', err)
+        setErrorMsg(err.message || 'Evaluation calculation failed. Please try again.')
+      }
     } finally {
-      setEvaluating(false)
+      if (requestId === evalRequestIdRef.current) {
+        setEvaluating(false)
+      }
     }
   }
 
@@ -208,7 +308,7 @@ export const ReadinessPage: React.FC = () => {
         <Button
           variant="primary"
           onClick={handleEvaluate}
-          disabled={evaluating || !selectedTargetId}
+          disabled={evaluating || loadingEvaluation || !selectedTargetId}
           className="flex items-center gap-2 self-start sm:self-auto"
         >
           <RefreshCw className={`w-4 h-4 ${evaluating ? 'animate-spin' : ''}`} />
@@ -239,8 +339,13 @@ export const ReadinessPage: React.FC = () => {
                     setSelectedTargetId(availableRoles[0].id)
                   } else if (newType === 'job_opening' && availableOpenings.length > 0) {
                     setSelectedTargetId(availableOpenings[0].id)
+                  } else {
+                    setSelectedTargetId('')
                   }
                 }}
+                disabled={evaluating}
+                aria-label="Target Type"
+                data-testid="target-type-select"
                 className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 focus:outline-none"
               >
                 <option value="role">Career Role</option>
@@ -250,6 +355,9 @@ export const ReadinessPage: React.FC = () => {
               <select
                 value={selectedTargetId}
                 onChange={(e) => setSelectedTargetId(e.target.value)}
+                disabled={evaluating}
+                aria-label="Target Selection"
+                data-testid="target-id-select"
                 className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 focus:outline-none max-w-xs truncate"
               >
                 {selectedTargetType === 'role'
@@ -274,7 +382,15 @@ export const ReadinessPage: React.FC = () => {
       </Card>
 
       {/* Main Readiness Score Summary */}
-      {evaluation ? (
+      {loadingEvaluation ? (
+        <div data-testid="readiness-eval-loading">
+          <Card className="p-8 text-center space-y-4 animate-pulse">
+            <div className="h-6 w-48 bg-gray-200 dark:bg-gray-800 rounded mx-auto" />
+            <div className="h-16 w-32 bg-gray-200 dark:bg-gray-800 rounded mx-auto" />
+            <div className="h-4 w-64 bg-gray-200 dark:bg-gray-800 rounded mx-auto" />
+          </Card>
+        </div>
+      ) : evaluation ? (
         <Card className="p-6 space-y-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-gray-100 dark:border-gray-800">
             <div className="space-y-1">
@@ -361,25 +477,31 @@ export const ReadinessPage: React.FC = () => {
           </div>
         </Card>
       ) : (
-        <Card className="p-8 text-center space-y-4" data-testid="readiness-empty">
-          <Compass className="w-12 h-12 text-gray-400 mx-auto" />
-          <div className="space-y-1">
-            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-              Ready to evaluate target alignment
-            </h3>
-            <p className="text-xs text-gray-500 max-w-md mx-auto">
-              Select your target role or opening above and run an on-demand evaluation against canonical
-              requirements.
-            </p>
-          </div>
-          <Button variant="primary" onClick={handleEvaluate} disabled={evaluating}>
-            {evaluating ? 'Calculating...' : 'Evaluate Now'}
-          </Button>
-        </Card>
+        <div data-testid="readiness-empty">
+          <Card className="p-8 text-center space-y-4">
+            <Compass className="w-12 h-12 text-gray-400 mx-auto" />
+            <div className="space-y-1">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                Ready to evaluate target alignment
+              </h3>
+              <p className="text-xs text-gray-500 max-w-md mx-auto">
+                Select your target role or opening above and run an on-demand evaluation against canonical
+                requirements.
+              </p>
+            </div>
+            <Button
+              variant="primary"
+              onClick={handleEvaluate}
+              disabled={evaluating || loadingEvaluation || !selectedTargetId}
+            >
+              {evaluating ? 'Calculating...' : 'Evaluate Now'}
+            </Button>
+          </Card>
+        </div>
       )}
 
       {/* Requirement Breakdown Section */}
-      {requirementResults.length > 0 && (
+      {!loadingEvaluation && requirementResults.length > 0 && (
         <div className="space-y-4">
           <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
             Requirement-Level Breakdown ({requirementResults.length})
